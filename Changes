@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.02  Fri Dec  7  8:47AM GMT 2001
+	- Fix Bug #003 (hopefully; untested)
+
 1.01  Mon Dec  3  5:23PM GMT 2001
 	- Fix bug #001
 	- Fix bug #002

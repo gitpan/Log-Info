@@ -1,0 +1,18 @@
+001	1.00	use Log::Info dies with :stderr not exported
+	1.01	Fixed
+
+002	1.00	syslog.t test fails on single-digit month days due to
+		bad RE.
+	1.01	Fixed
+
+003	1.00	Makefile.PL fails:
+		[riechert@tairou Log-Info-1.00]$ perl Makefile.PL 
+		Internal Check (8) failed
+		[riechert@tairou Log-Info-1.00]$ 
+
+		Where:
+		[riechert@tairou cpan]$ cat --version
+		cat (GNU textutils) 2.0a
+		Written by Torbjorn Granlund and Richard M. Stallman.
+
+	1.02	Fixed (hopefully; untested)

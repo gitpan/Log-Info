@@ -85,7 +85,7 @@ use constant CONFIG =>
                    my $rv = $? >> 8;
                    die sprintf "Command $cmd exited with value: $rv\n"
                      if $rv != $expect;
-                   return $vstr =~ /\b(\d+\.\d+)\b/ ? $1 : -1;
+                   return $vstr =~ /\b(\d+\.\d+)(?!\d)/ ? $1 : -1;
                  },
                },
   };

@@ -10,3 +10,5 @@ t/sinks.t
 t/syslog.t
 t/trans.t
 Makefile.PL
+BUGS
+t/defaults.t

@@ -372,7 +372,7 @@ use constant TRANS_UDT => sub { my $time = time;
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
