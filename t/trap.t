@@ -14,7 +14,7 @@ use Test       1.13 qw( ok plan );
 
 BEGIN { unshift @INC, $Bin };
 
-use test      qw( evcheck save_output restore_output );
+use test      qw( LIB_DIR evcheck save_output restore_output );
 use test2     qw( -no-ipc-run runcheck );
 
 # Sink names for playing with
@@ -27,14 +27,14 @@ use constant MESSAGE3 => 'Chippy Minton';
 use constant MESSAGE4 => 'Raggy Dan';
 
 BEGIN {
-  plan tests  => 29;
+  plan tests  => 25;
        todo   => [],
        ;
 }
 
 # ----------------------------------------------------------------------------
 
-use Log::Info qw( :default_channels Log );
+use Log::Info qw( :trap :default_channels Log );
 
 =head2 Test 1: compilation
 
@@ -47,18 +47,7 @@ ok 1, 1, 'compilation';
 
 # -------------------------------------
 
-=head2 Test 2: blankety blank
-
-This is a blank test, left here because I cannot be bothered renumbering the
-doco.
-
-=cut
-
-ok 1;
-
-# -------------------------------------
-
-=head2 Test 3: adding a sink
+=head2 Test 2: adding a sink
 
 This test deletes the C<SINK_STDERR> sink, and adds a sink (C<SINK1), to
 C<CHAN_INFO>.  The test is that no exception is thrown.
@@ -75,7 +64,7 @@ ok evcheck(sub {
 
 # -------------------------------------
 
-=head2 Test 4: logging some messages
+=head2 Test 3: logging some messages
 
 This test writes two log messages to the channel with the sink.  The test is
 that no exception is thrown.
@@ -93,7 +82,7 @@ ok evcheck(sub {
 
 # -------------------------------------
 
-=head2 Tests 5--6: checking the messages
+=head2 Tests 4--5: checking the messages
 
 These tests check that the expected messages have been passed to the log
 subroutine.
@@ -105,70 +94,7 @@ ok shift @mess, MESSAGE2, 'checking the messages (2)';
 
 # -------------------------------------
 
-=head2 Tests 7--9: checking that warn is not logged
-
-This test invokes warn, and checks (1) that no exception is thrown, (2) that
-it is not logged (to CHAN_INFO), and (3) that the message is written to stderr
-as usual.
-
-This is to check that nothing is messing with warn by default.
-
-=cut
-
-my $stderr;
-ok(evcheck(sub {
-             save_output('stderr', *STDERR{IO});
-             warn MESSAGE3 . "\n";
-             $stderr = restore_output('stderr');
-           }, 'checking that warn is not logged (1)'),
-   1, 'checking that warn is not logged (1)');
-
-ok scalar(@mess), 0, 'checking that warn is not logged (2)';
-ok $stderr, MESSAGE3 . "\n", 'checking that warn is not logged (3)';
-
-# -------------------------------------
-
-=head2 Tests 10--12: checking that die is not trapped
-
-This test invokes C<die> (within an C<eval>), and checks (1) that an exception
-is thrown, (2) that it is not logged (to CHAN_INFO), and (3) that the message
-is trapped in $@ as usual.
-
-This is to check that nothing is messing with die by default.
-
-=cut
-
-# Can't use evcheck here, as that traps the die!
-{
-  my $ok = 0;
-  eval {
-    die MESSAGE4 . "\n";
-  }; if ($@) {
-    $ok = 1;
-  }
-  ok $ok, 1, 'checking that die is not trapped (1)';
-}
-
-ok scalar(@mess), 0, 'checking that die is not trapped (2)';
-ok $@, MESSAGE4 . "\n", 'checking that die is not trapped (3)';
-
-# -------------------------------------
-
-=head2 Test 13: invoking trap_warn_die
-
-Invoke the C<trap_warn_die> function of C<Log::Info>.  Test that no exception
-is thrown.
-
-=cut
-
-ok(evcheck(sub {
-             Log::Info::trap_warn_die;
-           }, 'invoking trap_warn_die'),
-   1, 'invoking trap_warn_die');
-
-# -------------------------------------
-
-=head2 Tests 14--17: checking that warn is now logged
+=head2 Tests 6--9: checking that warn is now logged
 
 This test invokes warn, and checks (1) that no exception is thrown, (2) that
 exactly one message has been logged to CHAN_INFO, (3) the the message is
@@ -176,21 +102,24 @@ MESSAGE2, and (4) that the message is not written to stderr as usual.
 
 =cut
 
-ok(evcheck(sub {
-             save_output('stderr', *STDERR{IO});
-             warn MESSAGE2 . "\n";
-             $stderr = restore_output('stderr');
-           }, 'checking that warn is now logged (1)'),
-   1, 'checking that warn is now logged (1)');
+{
+  my $stderr;
+  ok(evcheck(sub {
+               save_output('stderr', *STDERR{IO});
+               warn MESSAGE2 . "\n";
+               $stderr = restore_output('stderr');
+             }, 'checking that warn is now logged (1)'),
+     1, 'checking that warn is now logged (1)');
 
-ok scalar(@mess), 1, 'checking that warn is now logged (2)';
-ok $mess[0], MESSAGE2 . "\n", 'checking that warn is now logged (3)';
-ok $stderr, '', 'checking that warn is now logged (4)';
-@mess = ();
+  ok scalar(@mess), 1, 'checking that warn is now logged (2)';
+  ok $mess[0], MESSAGE2 . "\n", 'checking that warn is now logged (3)';
+  ok $stderr, '', 'checking that warn is now logged (4)';
+  @mess = ();
+}
 
 # -------------------------------------
 
-=head2 Tests 18--21: checking that die messages are now trapped
+=head2 Tests 10--13: checking that die is now trapped
 
 This test invokes C<die> (within an C<eval>), and checks (1) that an exception
 is thrown, (2) that exactly one message has been logged to CHAN_INFO, (3) the
@@ -209,7 +138,7 @@ This is to check that nothing is messing with die by default.
   }; if ($@) {
     $ok = 1;
   }
-  ok $ok, 1, 'checking that die messages are now trapped (1)';
+  ok $ok, 1, 'checking that die is now trapped (1)';
 }
 
 ok scalar(@mess), 1, 'checking that die is now trapped (2)';
@@ -219,7 +148,7 @@ ok $@, MESSAGE1 . "\n", 'checking that die is now trapped (4)';
 
 # -------------------------------------
 
-=head2 Tests 22--25: checking that croak messages are now trapped
+=head2 Tests 14--17: checking that croak messages are now trapped
 
 This test invokes C<Carp::croak> (within an C<eval>), and checks (1) that an
 exception is thrown, (2) that exactly one message has been logged to
@@ -238,17 +167,17 @@ This is to check that nothing is messing with die by default.
   }; if ($@) {
     $ok = 1;
   }
-  ok $ok, 1, 'checking that die messages are now trapped (1)';
+  ok $ok, 1, 'checking that croak is now trapped (1)';
 }
 
-ok scalar(@mess), 1, 'checking that die is now trapped (2)';
-ok $mess[0], qr/^${\ MESSAGE1() }/, 'checking that die is now trapped (3)';
-ok $@, qr/^${\ MESSAGE1() }/, 'checking that die is now trapped (4)';
+ok scalar(@mess), 1, 'checking that croak is now trapped (2)';
+ok $mess[0], qr/^${\ MESSAGE1() }/, 'checking that croak is now trapped (3)';
+ok $@, qr/^${\ MESSAGE1() }/, 'checking that croak is now trapped (4)';
 @mess = ();
 
 # -------------------------------------
 
-=head2 Tests 26--29: checking that carp is now logged
+=head2 Tests 18--21: checking that carp is now logged
 
 This test invokes C<Carp::carp>, and checks (1) that no exception is thrown,
 (2) that exactly one message has been logged to CHAN_INFO, (3) the the message
@@ -257,16 +186,67 @@ usual.
 
 =cut
 
-ok(evcheck(sub {
-             save_output('stderr', *STDERR{IO});
-             carp MESSAGE2 . "\n";
-             $stderr = restore_output('stderr');
-           }, 'checking that warn is now logged (1)'),
-   1, 'checking that warn is now logged (1)');
+{
+  my $stderr;
+  ok(evcheck(sub {
+               save_output('stderr', *STDERR{IO});
+               carp MESSAGE2 . "\n";
+               $stderr = restore_output('stderr');
+             }, 'checking that warn is now logged (1)'),
+     1, 'checking that warn is now logged (1)');
 
-ok scalar(@mess), 1, 'checking that warn is now logged (2)';
-ok $mess[0], qr/^${\ MESSAGE2() }/, 'checking that warn is now logged (3)';
-ok $stderr, '', 'checking that warn is now logged (4)';
-@mess = ();
+  ok scalar(@mess), 1, 'checking that warn is now logged (2)';
+  ok $mess[0], qr/^${\ MESSAGE2() }/, 'checking that warn is now logged (3)';
+  ok $stderr, '', 'checking that warn is now logged (4)';
+  @mess = ();
+}
 
 # -------------------------------------
+
+=head2 Tests 22-23: exit test (die)
+
+Run
+
+  perl -I lib -MLog::Info=:trap -e '$!=4;die"Hello"'
+
+( 1) Check exit status is 4
+( 2) Check stderr reads Hello (twice, on per line)
+
+=cut
+
+{
+  my $err = '';
+  ok(runcheck([['perl',
+                -I => LIB_DIR,
+                '-MLog::Info=:trap',
+                -e => '$!=4;die"Hello"'],
+               '2>', \$err],
+              'exit test (die)', \$err, 4), 1,         'exit test (die) ( 1)');
+  ok $err, "Hello\nHello\n",                           'exit test (die) ( 2)';
+}
+
+# -------------------------------------
+
+=head2 Tests 24-25: exit test (croak)
+
+Run
+
+  perl -I lib -MCarp -MLog::Info=:trap -e '$!=4;carp"Hello"'
+
+( 1) Check exit status is 4
+( 2) Check stderr reads Hello (twice, on per line)
+
+=cut
+
+{
+  my $err = '';
+  ok(runcheck([['perl',
+                -I => LIB_DIR,
+                '-MCarp', '-MLog::Info=:trap',
+                -e => '$!=77;croak"Hello"'],
+               '2>', \$err],
+              'exit test (croak)', \$err, 77), 1,    'exit test (croak) ( 1)');
+  ok $err,"Hello at -e line 1\nHello at -e line 1\n",'exit test (croak) ( 2)';
+}
+
+# ----------------------------------------------------------------------------

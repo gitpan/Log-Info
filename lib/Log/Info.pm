@@ -73,6 +73,43 @@ welcomed by the author.
 For those wishing to use a different set of policies for whatever reason,
 channel creation, etc. are all completely available to the user.
 
+=head2 EXPORTS
+
+All items are exported on request, except where noted
+
+=over 4
+
+=item :trap
+
+Not really an export, but a pragma.  Add handlers to warn(), die(), to log
+messages to the log system.
+
+The die handler logs the message to C<CHAN_INFO> at C<LOG_ERR>.  The die
+message is still propogated up the call stack, so will typically appear on
+stderr.  If CHAN_INFO is directed to stderr, then the error message will
+appear twice.
+
+The warn handler logs the message to C<CHAN_INFO> at C<LOG_WARNING>.
+
+This also traps C<Carp> messages, I<as long as this is installed after Carp>
+--- so do the C<use Carp> before the C<use Log::Info qw( :trap );
+
+=item Log
+
+B<Exported by default>
+
+=item Logf
+
+B<Exported by default>
+
+=item :log_levels
+
+=item :syslog_facilities
+
+=item :default_channels
+
+=back
+
 =cut
 
 # ----------------------------------------------------------------------------
@@ -505,7 +542,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.09';
+our $VERSION = '1.10';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1485,27 +1522,113 @@ I<None>
 
 =cut
 
-sub trap_warn_die {
+sub import {
+  my $class = shift;
+  my (@bad_names, @export_symbols);
+  my %export_ok = map({; $_ => 1 }
+                      ':DEFAULT', @EXPORT, @EXPORT_OK,
+                      map(":$_", keys %EXPORT_TAGS));
+  for (@_) {
+    if ( $_ eq ':trap' ) {
+      __trap_warn_die();
+    } elsif ( exists $export_ok{$_} ) {
+      push @export_symbols, $_;
+    } else {
+      push @bad_names, $_;
+    }
+  }
 
-  my $diehook = $SIG{__DIE__};
+  croak ("Arguments to " . __PACKAGE__ .
+         " import  not recognized: ",
+         join (', ', @bad_names), "\n")
+    if @bad_names;
+
+  $class->export_to_level(1, $class, @export_symbols);
+
+}
+
+my %redef_subr; # track of subrs intentionally redefined to exclude from
+                # warnings
+sub trap_warn_die {
+  Log(CHAN_INFO, LOG_WARNING,
+      "trap_warn_die subr deprecated; use the import tag :trap instead\n");
+  __trap_warn_die();
+}
+
+sub __trap_warn_die {
+
   my $lastmessage = '';
 
-  $SIG{__DIE__} = sub {
-    if ( $_[0] !~ /\A[\s\n]*\Z/ ) {
-      Log(CHAN_INFO, LOG_ERR, $_[0])
-        unless $_[0] eq $lastmessage;
-      $lastmessage = $_[0];
-    }
-    $diehook->(@_)
-      if defined $diehook and UNIVERSAL::isa($diehook, 'CODE');
+  my $package;
+  {
+    my $i = 0;
+    do {
+      ($package) = (caller($i))[0];
+      $i++;
+    } while ( $package eq __PACKAGE__ );
+  }
+
+  my $file = __FILE__;
+  my $warnhook = $SIG{__WARN__};
+
+  $SIG{__WARN__} = sub {
+    # Nasty hack to avoid irritating mandatory redefine warnings bug
+    return
+      if $_[0] =~
+        /^Subroutine (\w+) redefined at $file/ and exists $redef_subr{$1};
+    my $message = join '', grep defined, @_;
+    Log(CHAN_INFO, LOG_WARNING, $message);
   };
 
-  my $warnhook = $SIG{__WARN__};
-  $SIG{__WARN__} = sub {
-    Log(CHAN_INFO, LOG_WARNING, $_[0]);
-    $warnhook->(@_)
-      if defined $warnhook and UNIVERSAL::isa($warnhook, 'CODE');
+  my $save;
+
+  my $diehook = $SIG{__DIE__};
+  # Carp doesn't call die directly.  In know not how or why.  So this traps
+  # calls to carp that didn't make it via the override
+  $SIG{__DIE__} = sub {
+    my $message = join '', grep defined, @_;
+      if ( $message !~ /\A[\s\n]*\Z/ ) {
+        Log(CHAN_INFO, LOG_ERR, $message)
+          unless $message eq $lastmessage;
+      }
+    $diehook->(@_)
+      if defined $diehook and UNIVERSAL::isa($diehook, 'CODE');
+    $! = $save
+      if $save;
   };
+
+  # Override Carp messages if present
+  for (qw( croak confess )) {
+    no strict 'refs';
+    my $subr = \&{"$package::$_"};
+    if ( defined $subr ) {
+    $redef_subr{$_} = 1;
+      *{"${package}::${_}"} = sub {
+        $save = $!+0;
+        $subr->(@_);
+      };
+    }
+  }
+
+  *CORE::GLOBAL::die =
+    sub {
+      $save = $! + 0;
+      my $message = join '', grep defined, @_;
+      if ( $message !~ /\A[\s\n]*\Z/ ) {
+        # Always terminate with a newline.  This ensures conformity of message
+        # with that checked in SIG{__DIE__}, which otherwise may have an
+        # "\n  at line..." appended.
+        # If we want such appendages, we can add them ourselves
+        $message =~ s/\n*\z/\n/;
+        Log(CHAN_INFO, LOG_ERR, $message)
+          unless $message eq $lastmessage;
+        $lastmessage = $message;
+      }
+      $! = $save
+        if $save;
+      CORE::die("$message");
+    };
+
 }
 
 # -------------------------------------

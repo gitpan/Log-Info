@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.10  Fri Aug  2  5:47PM GMT 2002
+	- Override, rather than hook, trap_warn_die
+
 1.09  Tue Jul 23 11:58PM GMT 2002
 	- Remove IPC::Run from requirements
 	- Add level-spec handling to enable_file_channel

@@ -143,7 +143,7 @@ Test message logged is what is expected after channel translation.
     $ok = 0;
   }
 
-  ok $messages[0], qr/^\[\d+\ \w{3}\ \w{3}\ \d{1,2}
+  ok $messages[0], qr/^\[\d+\ \w{3}\ \w{3}\ {1,2}\d{1,2}
                        \ \d{1,2}:\d{2}:\d{2}\ \d{4}\]
                        \ @{[MESSAGE1]}$/x, 'TRANS_UDT';
   @messages = ();
