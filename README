@@ -19,7 +19,6 @@ Required Perl Version:
 
 Required Packages:
 
-    IPC-Run           0.44
     Class-MethodMaker 1.02
 
 Required Executables:
@@ -36,4 +35,4 @@ Copyright:
     you can redistribute it and/or modify it under the same terms as Perl
     itself.
 
-19th June, 2002
+23rd July, 2002

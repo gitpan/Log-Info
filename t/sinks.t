@@ -13,7 +13,8 @@ use Test                  1.13 qw( ok plan );
 
 BEGIN { unshift @INC, $Bin };
 
-use test      qw( evcheck runcheck );
+use test      qw( evcheck );
+use test2     qw( -no-ipc-run runcheck );
 
 
 # Channel names for playing with

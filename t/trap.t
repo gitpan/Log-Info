@@ -14,8 +14,8 @@ use Test       1.13 qw( ok plan );
 
 BEGIN { unshift @INC, $Bin };
 
-use test      qw( evcheck runcheck save_output restore_output );
-
+use test      qw( evcheck save_output restore_output );
+use test2     qw( -no-ipc-run runcheck );
 
 # Sink names for playing with
 use constant SINK1 => 'sink1';

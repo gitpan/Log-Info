@@ -1,2 +1,10 @@
 ^(.*/)?CVS/.*
-Makefile
+^Makefile(.old)?$
+^Build$
+^Clean$
+^RollingBuild$
+^blib/.*
+^pm_to_blib$
+^.cvsignore$
+^MANIFEST.bak$
+

@@ -12,10 +12,6 @@ use constant MOD_REQS =>
      package => 'Class-MethodMaker',
      version => '1.02', },
 
-   { name    => 'IPC::Run',
-     package => 'IPC-Run',
-     version => '0.44', },
-
    { name    => 'Term::ProgressBar',
      package => 'Term-ProgressBar',
      version => '2.00',

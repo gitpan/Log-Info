@@ -384,6 +384,10 @@ Filehandle to output to, or name of file.  B<Beware>: if you present a
 filehandle, you probably want to provide a glob ref (e.g., C<\*STDERR>); the
 C<*foo{THING}> will never act as a terminal.  undef defaults to STDERR.
 
+=item level
+
+B<Optional>  A sink message cutoff level.  Defaults to C<undef>
+
 =cut
 
 # FOR TESTING
@@ -396,7 +400,7 @@ sub SINK_TERM_PROGRESS {
                 (caller 0)[3], $@)
     if $@;
 
-  my ($fh) = @_;
+  my ($fh, $level) = @_;
 
   my $fn;
   if ( defined $fh ) {
@@ -464,9 +468,9 @@ sub SINK_TERM_PROGRESS {
          };
   } else {
     if ( defined $fn ) {
-      return 'FILE', undef, { fn => $fh };
+      return 'FILE', $level, { fn => $fh };
     } else {
-      return 'FH',   undef, { fh => $fh };
+      return 'FH',   $level, { fh => $fh };
     }
   }
 }
@@ -501,7 +505,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.08';
+our $VERSION = '1.09';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1508,7 +1512,7 @@ sub trap_warn_die {
 
 =head2 enable_file_channel
 
-Set up output channel (for string based options).
+Set up output channel (for string based command-line options).
 
 =over 4
 
@@ -1529,9 +1533,20 @@ If this option looks like C<m!^:\d+!>, the numeric value will be treated as a
 file descriptor, and output sent there.  If this value is defined, but a
 blank string, then output will be sent to stderr.
 
+If a value of the form C<\+\d+> precedes a file descriptor, or succeeds a
+filename, then the numeric value is used to set the log level of the output
+sink.  If not set, it defaults to C<LOG_INFO>, which is equivalent to C<+1>.
+Hence, C<+0> is equivalent to C<LOG_INFO - 1>.
+
 If this value is not defined, then no action is taken (this is to allow
 compatibility with options processors, where a value is left undefined if its
 option is never invoked).
+
+If this value is defined but empty (C<''>), then the log level is set to
+LOG_INFO (first time), and the output sent to STDERR.  If the option is seen
+again, still with an empty string value, and with the same channel & sink
+names, then the log level is increased one place.  This is to allow C<-v -v
+-v>(or C<-vvv>)-style options.
 
 =item option_name
 
@@ -1551,12 +1566,23 @@ I<Optional>  If true, generate a sink with SINK_TERM_PROGRESS
 
 =cut
 
+my %seen_channel_sink;
 sub enable_file_channel {
   my ($channel_name, $fn, $option_name, $sink_name, $term_progress) = @_;
 
   if ( defined $fn ) { # Else option not invoked
+    $fn =~ s/\s*(.*?)\s*$/$1/;
     my $fh;
-    if ( $fn =~ /^\s*$/ ) {
+
+    my $level = LOG_INFO;
+    if ( $fn =~ s/\+(\d+)// ) {
+      $level += $1-1;
+    } else {
+      my $key = join "\0", $channel_name, $sink_name;
+      $level += $seen_channel_sink{$key}++;
+    }
+
+    if ( $fn eq '' ) {
       $fh = \*STDERR;
     } elsif ( substr($fn, 0, 1) eq ':' ) {
       my $fd = substr($fn, 1);
@@ -1580,9 +1606,9 @@ sub enable_file_channel {
 
     if ( defined $fh ) {
       if ( $term_progress ) {
-        add_sink($channel_name, $sink_name, SINK_TERM_PROGRESS($fh));
+        add_sink($channel_name, $sink_name, SINK_TERM_PROGRESS($fh, $level));
       } else {
-        add_sink($channel_name, $sink_name, 'FH', undef, { fh => $fh });
+        add_sink($channel_name, $sink_name, 'FH', $level, { fh => $fh });
       }
     }
   }

@@ -1,6 +1,10 @@
 Revision history for Perl extension Log::Info.
 
-1.08	Wed Jun 19 11:49PM GMT 2002
+1.09  Tue Jul 23 11:58PM GMT 2002
+	- Remove IPC::Run from requirements
+	- Add level-spec handling to enable_file_channel
+
+1.08  Wed Jun 19 11:49PM GMT 2002
 	- SINK_TERM_PROGRESS; use linear ETA, update at least every five 
           seconds (if called often enough), update after every message
 	- Buglet in Logf when confused by incoming fixed ($_ in q!! literal 

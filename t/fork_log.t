@@ -19,7 +19,8 @@ use Test                   1.13 qw( ok plan );
 BEGIN { unshift @INC, $Bin };
 
 use test      qw( DATA_DIR
-                  evcheck runcheck save_output restore_output );
+                  evcheck save_output restore_output );
+use test2     qw( -no-ipc-run runcheck );
 
 # Message texts for playing with
 use constant MESSAGE1 => 'The Journey of Master Ho';
