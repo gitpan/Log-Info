@@ -1,5 +1,9 @@
 Revision history for Perl extension Log::Info.
 
+1.14  Wed Dec 18 12:21PM GMT 2002
+	- Various patches to work with Solaris
+	- Remove fork_log export from Log::Info::Fork
+
 1.13  Thu Dec  5  6:07PM GMT 2002
 	- Fix multiple stderr messages for die, warn etc.
 

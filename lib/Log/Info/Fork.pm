@@ -30,7 +30,7 @@ use base qw( Exporter );
 our (@EXPORT_OK);
 
 BEGIN {
-  @EXPORT_OK = qw( fork_log SRC_INFO );
+  @EXPORT_OK = qw( SRC_INFO );
 }
 
 # Utility -----------------------------
@@ -89,8 +89,6 @@ Z<>
 =head2 fork_log
 
 Fork, and log the output of the child.
-
-Exported by request.
 
 =over 4
 

@@ -131,15 +131,17 @@ BEGIN {
 
 # Utility -----------------------------
 
-use Carp              qw( carp croak );
-use Fatal        1.02 qw( :void close open seek sysopen );
-use Fcntl        1.03 qw( O_WRONLY O_APPEND O_CREAT O_EXCL );
-use FindBin      1.42 qw( $Script );
-use IO::Handle   1.21 qw( );
-use IO::Pipe    1.121 qw( );
-use IO::Select   1.14 qw( );
-use POSIX        1.03 qw( strftime );
-use Sys::Syslog  0.01 qw( openlog closelog syslog setlogmask setlogsock );
+use Carp                        qw( carp croak );
+use Env                         qw( @PATH );
+use Fatal                  1.02 qw( :void close open seek sysopen );
+use Fcntl                  1.03 qw( O_WRONLY O_APPEND O_CREAT O_EXCL );
+use File::Spec::Functions   1.1 qw( catfile );
+use FindBin                1.42 qw( $Script );
+use IO::Handle             1.21 qw( );
+use IO::Pipe              1.121 qw( );
+use IO::Select             1.14 qw( );
+use POSIX                  1.03 qw( strftime );
+use Sys::Syslog            0.01 qw( openlog closelog syslog setlogmask setlogsock );
 
 # fails under 5.6.
 # require 'syslog.ph';
@@ -538,15 +540,80 @@ use constant TRANS_UDT =>
         sprintf('[%d %s] %s',
                 $time, scalar gmtime $time, $_[0]) };
 
-use constant TRANS_CDT =>
-  sub { my $time = time;
-        sprintf('[%s:%s] %s', strftime('%s(%d%b %H:%M:%S%z)', localtime),
-                $0, $_[0]); };
+{ # Very unpleasant hackery to discern timezone offset on systems with backward
+  # strftimes.  Bloody Solaris.
+
+  my $save = $!+0;
+
+  my $format = '(%d%b %H:%M:%S%z)';
+  my $check = strftime('%z',localtime);
+  if ( $check eq '%z' ) {
+    $format = undef;
+
+  ATTEMPT:
+    # sfw for recent Solaris boxen
+    for my $path (@PATH, '/opt/sfw/bin') {
+      for my $dname (qw( date gdate )) {
+        my $date = catfile $path, $dname;
+        next
+          unless -x $date;
+
+#         pipe my ($read, $write);
+#         die "fork failed: $!\n"
+#           unless defined (my $pid = fork);
+#
+#         if ( $pid ) { # Parent
+#           close $write;
+#           print STDERR $_
+#             for <$read>;
+#         } else {      # Child
+#           close $read;
+#           open STDOUT, '>&=', fileno $write;
+#           open STDERR, '>&=', fileno $write;
+#
+#           exec $date, '--version';
+#         }
+
+        my $date_version = qx( $date --version 2>&1 );
+        {
+          local $/ = undef;
+          open *DATE, "$date --version 2>&1 |";
+          $date_version = <DATE>;
+          close *DATE;
+        }
+
+        if ( $date_version =~ m/^date \(GNU.*\) ([\d.]+)$/m ) {
+          (my $version = $1);
+          my @v = split /\./, $version;
+          $version = join('.', $v[0],
+                          join '', map sprintf('%03d', $_), @v[1..$#_]);
+          if ( $version >= 2 ) {
+            chomp(my $timezone = qx( $date +%z ));
+            $format   = "(%d%b %H:%M:%S$timezone)";
+            last ATTEMPT;
+          } # end if ( $version >= 2 )
+        } # end if ( $date_version =~ m/^date \(GNU.*\) ([\d.]+)$/m )
+      } # for my $dname (qw( date gdate ))
+    } # end for my $path (@PATH)
+
+    # A questionable llseek on Solaris leaves ESPIPE in $!
+    $! = $save;
+  } # end if ( $check eq '%z' )
+
+  use constant TRANS_CDT =>
+    sub { my $time = time;
+          die "Cannot determine timezone info.  Sorry.  Perhaps installing gnu date will help\n"
+            unless defined $format;
+          sprintf('[%d%s:%s] %s',
+                  $time,
+                  strftime($format, localtime($time)),
+                  $0, $_[0]); };
+}
 
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.13';
+our $VERSION = '1.14';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1581,8 +1648,10 @@ sub __trap_warn_die {
   $SIG{__WARN__} = sub {
     # Nasty hack to avoid irritating mandatory redefine warnings bug
     return
-      if $_[0] =~
-        /^Subroutine (\w+) redefined at $file/ and exists $redef_subr{$1};
+      if ( ( $_[0] =~ /^Subroutine ([:\w]+) redefined at $file/ ) and 
+           ( exists $redef_subr{$1} or 
+             ( index($1,':') == -1 and exists $redef_subr{"main::$1"} )
+           ) );
     my $message = join '', grep defined, @_;
     Log(CHAN_INFO, LOG_WARNING, $message);
     $warnhook->(@_)
@@ -1610,10 +1679,11 @@ sub __trap_warn_die {
   # Override Carp messages if present
   for (qw( croak confess )) {
     no strict 'refs';
-    my $subr = \&{"$package::$_"};
+    my $subr_name = defined $package ? "${package}::$_" : $_;
+    my $subr = \&{$subr_name};
     if ( defined $subr ) {
-    $redef_subr{$_} = 1;
-      *{"${package}::${_}"} = sub {
+      $redef_subr{$subr_name} = 1;
+      *{"$subr_name"} = sub {
         $save = $!+0;
         $subr->(@_);
       };

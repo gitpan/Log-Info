@@ -10,6 +10,9 @@ This package tests the absence of unwanted warnings of Log::Info
 
 use FindBin 1.42 qw( $Bin );
 use Test 1.13 qw( ok plan );
+use File::Spec::Functions qw( rel2abs );
+
+use constant PERL => rel2abs $^X;
 
 use lib $Bin;
 use test2 qw( runcheck );
@@ -47,7 +50,7 @@ Run
 
 {
   my ($out, $err) = ('') x 2;
-  ok(runcheck([[$^X, '-MLog::Info=:trap', '-MLog::Info=:trap', -e => ''],
+  ok(runcheck([[PERL, '-MLog::Info=:trap', '-MLog::Info=:trap', -e => ''],
                '>', \$out, '2>', \$err],
               'double :trap import'),
      1,                                           'double :trap import (run)');

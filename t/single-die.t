@@ -11,6 +11,9 @@ warnings, etc. once to stderr.
 
 use FindBin 1.42 qw( $Bin );
 use Test 1.13 qw( ok plan );
+use File::Spec::Functions qw( rel2abs );
+
+use constant PERL => rel2abs $^X;
 
 use lib $Bin;
 use test2 qw( runcheck );
@@ -40,9 +43,9 @@ sub death {
     unless defined $type;
 
   my ($out, $err) = ('') x 2;
-  ok(runcheck([[$^X, @$libs, '-MLog::Info=:trap', -e => qq'$call "Blibble"'],
+  ok(runcheck([[PERL, @$libs, '-MLog::Info=:trap', -e => qq'$call "Blibble"'],
                '>', \$out, '2>', \$err,],
-              'die ( 1)', undef, $exit),
+              "$name ( 1)", undef, $exit),
      1,                                                          "$name ( 1)");
   ok $out, '',                                                   "$name ( 2)";
 
@@ -58,7 +61,7 @@ sub death {
   ok $err, $expect,                                              "$name ( 3)";
 
   ($out, $err) = ('') x 2;
-  ok(runcheck([[$^X, @$libs, '-MLog::Info=:trap', -e => qq'$call "Blibble\n"'],
+  ok(runcheck([[PERL, @$libs, '-MLog::Info=:trap', -e => qq'$call "Blibble\n"'],
                '>', \$out, '2>', \$err,],
               'die ( 1)', undef, $exit),
      1,                                                          "$name ( 4)");

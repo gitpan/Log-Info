@@ -50,7 +50,7 @@ BEGIN {
 # ----------------------------------------------------------------------------
 
 use Log::Info qw( :default_channels :log_levels Log );
-use Log::Info::Fork qw( fork_log SRC_INFO );
+use Log::Info::Fork qw( SRC_INFO );
 
 =head2 Test 1: compilation
 

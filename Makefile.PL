@@ -28,6 +28,26 @@ use constant EXEC_REQS =>
   [
   ];
 
+use POSIX qw( strftime );
+BEGIN {
+  my $check = strftime('%z',localtime);
+  if ( $check eq '%z' ) {
+    print STDERR <<'END';
+Beware!  Since your strftime is so backward as to not support %z, I am going
+to fake it --- but this means that processes running whilst timezones change
+under them will present incorrect timezone offset info.  This is normally an
+issue only for processes running when daylight savings comes into force.
+
+If I cannot find a version of gnu date (at runtime), then I cannot fake it up,
+either.  Sorry about that.
+
+Currently this only affects the TRANS_CDT translator.
+
+
+END
+  }
+}
+
 use constant NAME         => 'Log-Info';
 use constant VERSION_FROM => catfile (qw( lib Log Info.pm ));
 use constant AUTHOR       => 'Martyn J. Pearce fluffy@cpan.org';

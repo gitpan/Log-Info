@@ -111,15 +111,19 @@ Grep syslog for messages; test MESSAGE1 is present, MESSAGE2 is not.
 =cut
 
 {
-# sleep 5;
   my ($ok, $skip) = (0) x 2;
 
-  eval {
-    open *SYSLOG, SYSLOG
-  }; if ( $@ ) {
-    warn "Failed to open ${\ SYSLOG() }: $@\n"
-      if $ENV{TEST_DEBUG};
-    $skip = "cannot open ${\ SYSLOG() }";
+  $skip = "set TEST_SYSLOG to run (on a system with a suitable syslog config)"
+    unless $ENV{TEST_SYSLOG};
+
+  unless ( $skip ) {
+    eval {
+      open *SYSLOG, SYSLOG
+    }; if ( $@ ) {
+      warn "Failed to open ${\ SYSLOG() }: $@\n"
+        if $ENV{TEST_DEBUG};
+      $skip = "cannot open ${\ SYSLOG() }";
+    }
   }
 
   unless ( $skip ) {
@@ -141,6 +145,9 @@ Grep syslog for messages; test MESSAGE1 is present, MESSAGE2 is not.
             warn "Weird message seen at line $.:\n  $_\n"
               if $ENV{TEST_DEBUG};
           }
+        } else {
+          warn "Ignoring syslog message at line $. ($Script/$pid) ($prog/$$) :\n  $_\n"
+            if $ENV{TEST_DEBUG} > 1;
         }
       } elsif ( $ENV{TEST_DEBUG} ) {
         warn "Couldn't match syslog line $.:\n  $_\n"

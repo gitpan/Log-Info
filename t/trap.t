@@ -11,6 +11,9 @@ This package tests the use of trapping warn()/die() in Log::Info.
 use Carp            qw( carp croak );
 use FindBin    1.42 qw( $Bin );
 use Test       1.13 qw( ok plan );
+use File::Spec::Functions qw( rel2abs );
+
+use constant PERL => rel2abs $^X;
 
 BEGIN { unshift @INC, $Bin };
 
@@ -216,7 +219,7 @@ Run
 
 {
   my $err = '';
-  ok(runcheck([['perl',
+  ok(runcheck([[PERL,
                 -I => LIB_DIR,
                 '-MLog::Info=:trap',
                 -e => '$!=4;die"Hello"'],
@@ -231,7 +234,7 @@ Run
 
 Run
 
-  perl -I lib -MCarp -MLog::Info=:trap -e '$!=4;carp"Hello"'
+  perl -I lib -MCarp -MLog::Info=:trap -e '$!=77;carp"Hello"'
 
 ( 1) Check exit status is 4
 ( 2) Check stderr reads Hello (twice, on per line)
@@ -240,7 +243,7 @@ Run
 
 {
   my $err = '';
-  ok(runcheck([['perl',
+  ok(runcheck([[PERL,
                 -I => LIB_DIR,
                 '-MCarp', '-MLog::Info=:trap',
                 -e => '$!=77;croak"Hello"'],
