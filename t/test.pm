@@ -150,7 +150,7 @@ use constant LIB_DIR  => catdir $Bin, updir, 'lib';
 unshift @PERL5LIB, LIB_DIR;
 unshift @INC,      LIB_DIR;
 
-my $tmpdn = tempdir(CLEANUP => $ENV{TEST_DEBUG});
+my $tmpdn = tempdir(CLEANUP => ! $ENV{TEST_DEBUG});
 mkpath $tmpdn;
 die "Couldn't create temp dir: $tmpdn: $!\n"
   unless -r $tmpdn and -w $tmpdn and -x $tmpdn and -o $tmpdn and -d $tmpdn;

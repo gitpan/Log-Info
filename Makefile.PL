@@ -15,9 +15,13 @@ use constant MOD_REQS =>
    { name    => 'Pod::Usage',
      version => '1.12', },
 
-#   { name    => 'Class::MethodMaker',
-#     package => 'Class-MethodMaker',
-#     version => '1.02', },
+   { name    => 'IPC::Run',
+     version => '0.44',
+     package => 'IPC-Run', },
+
+   { name    => 'Class::MethodMaker',
+     package => 'Class-MethodMaker',
+     version => '1.02', },
   ];
 
 use constant EXEC_REQS =>

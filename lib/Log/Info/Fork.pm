@@ -39,7 +39,6 @@ use B::Deparse         0.60 qw( );
 use Carp                    qw( carp croak );
 use Class::MethodMaker 1.02 qw( );
 use Fatal              1.02 qw( :void close open seek sysopen );
-use List::Util         1.06 qw( first );
 
 use Log::Info qw( :default_channels :log_levels :DEFAULT
                   $PACKAGE $VERSION );
@@ -448,7 +447,18 @@ sub pump_all {
     my @can_read = $selector->can_read;
 
     foreach my $fh (@can_read) {
-      my $fh_info = first { $_->{pipe} == $fh } $self->fhs;
+      my $fh_info;
+    FH:
+      for ($self->fhs) {
+        if ( $_->{pipe} == $fh ) {
+          $fh_info = $_;
+          last FH;
+        }
+      }
+
+      croak "Whoa!  Where did this FH come from? $fh\n"
+        unless defined $fh_info;
+      
       $outname = $fh_info->{name};
       $bufr = \$fh_info->{linebuf};
 
