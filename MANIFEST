@@ -1,0 +1,12 @@
+Changes
+MANIFEST
+MANIFEST.SKIP
+README
+lib/Log/Info.pm
+t/basic.t
+t/errors.t
+t/file.t
+t/sinks.t
+t/syslog.t
+t/trans.t
+Makefile.PL

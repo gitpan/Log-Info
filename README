@@ -1,0 +1,28 @@
+Perl Module Log-Info:
+
+    Single interface for log output
+
+Description:
+
+Modules & Classes:
+
+    Log::Info - Single interface for log output
+
+Executables:
+
+    *None*
+
+Required Packages:
+
+    *None*
+
+Package Maintainer: 
+
+    Martyn J. Pearce fluffy@cpan.org
+
+Copyright: 
+
+    Copyright (c) 2001 Martyn J. Pearce.  This program is free software; you
+    can redistribute it and/or modify it under the same terms as Perl itself.
+
+26th November, 2001

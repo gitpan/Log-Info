@@ -1,0 +1,7 @@
+Revision history for Perl extension Log::Info.
+
+1.00  Mon Nov 26 10:19PM GMT 2001
+	- original version
+	- includes FILE, FH, SYSLOG, SUBR logging
+	- includes default logging channels
+	- includes test suite (basic, errors, file, sinks, syslog, trans)
