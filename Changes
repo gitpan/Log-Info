@@ -1,9 +1,13 @@
 Revision history for Perl extension Log::Info.
 
-1.18  Wed Mar 19  4:34PM GMT 2002
+1.19  Fri May 30  6:52PM GMT 2003
+	- Correct bug in _log_to_file causing filehandles to get consumed at
+	  a rate of one per log message!
+
+1.18  Wed Mar 19  4:34PM GMT 2003
 	- Don't check exitcode of 'date' in TRANS_CDT
 
-1.17  Wed Jan 22  5:26PM GMT 2002
+1.17  Wed Jan 22  5:26PM GMT 2003
 	- Fixes for perl 5.8.0
 	- Don't perform t/single-die.t, t/trap.t without IPC-Run, since the
 	  non-IPC-Run loop has some timing issues

@@ -615,7 +615,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.18';
+our $VERSION = '1.19';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1482,7 +1482,7 @@ SIZE_CHECK:
     if ( ! defined $fh ) {
       # Open a shiny new fh, and assign it to fh
       if ( sysopen $fh, $logfn, O_WRONLY | O_APPEND | O_CREAT ) {
-        $values->{$fh} = $fh;
+        $values->{fh} = $fh;
       } else {
         warn "Log::Info::Log : Couldn't open $logfn for appending: $!\n";
         delete_sink ($channel, $name);
