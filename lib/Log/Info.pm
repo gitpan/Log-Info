@@ -15,24 +15,25 @@ Log::Info - Single interface for log output
   Log  (LCN_ERROR, LOG_ERR,  "A fatal error occurred");
   Logf (LCN_INFO,  LOG_INFO, "Loading file: %s", $filename);
 
-  Log::Info::add_sink       (CHAN_STATS, 'stats-file', 'FILE', LOG_INFO,
-                             { fn => "$ENV{HOME}/stats",
-                               maxsize => 10 * 1024**2, # 1M,
-                             });
+  Log::Info::add_sink               (CHAN_STATS, 'stats-file', 'FILE',
+                                     LOG_INFO,
+                                     { fn => "$ENV{HOME}/stats",
+                                       maxsize => 10 * 1024**2, # 1M,
+                                     });
 
-  Log::Info::add_sink       (CHAN_DEBUG, 'stderr', 'FH', LOG_INFO,
-                             { fh => *STDERR{IO} })
+  Log::Info::add_sink               (CHAN_DEBUG, 'stderr', 'FH', LOG_INFO,
+                                     { fh => *STDERR{IO} })
     if $opt_debug;
 
-  Log::Info::set_channel_out_level(CHAN_INFO, SINK_STDERR, LOG_INFO);
+  Log::Info::set_sink_out_level     (CHAN_INFO, SINK_STDERR, LOG_INFO);
 
-  Log::Info::add_channel    ('MYLOG', $fh);
-  Log::Info::set_out_level  ('MYLOG', LOG_WARNING);
-  Log::Info::add_sink       ('MYLOG', 'mysink', 'FILE', LOG_ERR,
-                             { fn => '/tmp/mylog' });
-  Log                       ('MYLOG', LOG_INFO, 'I got to here...');
-  Log::Info::delete_sink    ('MYLOG', 'outf');
-  Log::Info::delete_channel ('MYLOG');
+  Log::Info::add_channel            ('MYLOG', $fh);
+  Log::Info::set_channel_out_level  ('MYLOG', LOG_WARNING);
+  Log::Info::add_sink               ('MYLOG', 'mysink', 'FILE', LOG_ERR,
+                                     { fn => '/tmp/mylog' });
+  Log                               ('MYLOG', LOG_INFO, 'I got to here...');
+  Log::Info::delete_sink            ('MYLOG', 'outf');
+  Log::Info::delete_channel         ('MYLOG');
 
 =head1 DESCRIPTION
 
@@ -95,7 +96,7 @@ use Carp               qw( carp croak );
 use Fatal              qw( :void close open seek sysopen );
 use Fcntl              qw( O_WRONLY O_APPEND O_CREAT );
 use FindBin            qw( $Script );
-use IO                 qw( ); # For methods on filehandles
+use IO::Handle         qw( );
 use Sys::Syslog        qw( openlog closelog syslog setlogmask setlogsock );
 
 # fails under 5.6.
@@ -267,8 +268,8 @@ sub __dump_levels{
 
 Each of the following channels exist by default, and have their channel level
 set to C<undef>.  Only L<CHAN_INFO|"CHAN_INFO"> has a sink by default; called
-SINK_STDERR, which is a filehandle to STDERR, and is set at level
-L<LOG_WARNING|"LOG_WARNING">.
+SINK_STDERR (a name exported with the C<:default_channels> tag), which is a
+filehandle to STDERR, and is set at level L<LOG_WARNING|"LOG_WARNING">.
 
 Each channel and sink name will be exported upon request, or together using
 the C<:default_channels> tag.
@@ -372,7 +373,7 @@ use constant TRANS_UDT => sub { my $time = time;
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.02';
+our $VERSION = '1.03';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -483,7 +484,7 @@ sub add_channel {
 }
 
 BEGIN {
-  add_channel(eval "$_")
+  add_channel(eval "$_", undef)
     for DEFAULT_CHANNELS;
 }
 

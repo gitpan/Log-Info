@@ -16,3 +16,13 @@
 		Written by Torbjorn Granlund and Richard M. Stallman.
 
 	1.02	Fixed (hopefully; untested)
+
+004	1.02	Default channels created with LOG_INFO as channel level, in
+		contradiction to documentation
+	1.03	Fixed (in BEGIN block in Info.pm), test added to defaults.t
+
+005	1.02	syswrite fails:
+		Log::Info::Log : Print to filehandle :stderr on channel :info failed:
+		  Can't locate object method "syswrite" via package "IO::Handle" at /usr/local/share/perl/5.6.0/Log/Info.pm line 803.
+
+	1.03	Fixed (in import of IO in Info.pm)
