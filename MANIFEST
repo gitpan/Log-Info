@@ -18,3 +18,7 @@ t/enablefc.t
 t/fork_log.t
 t/test.pm
 t/trap.t
+make.pm
+t/def-trans.t
+t/progress-2.t
+t/progress.t

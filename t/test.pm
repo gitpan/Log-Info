@@ -112,18 +112,22 @@ The following symbols are exported upon request:
 
 =item evcheck
 
+=item tmpnam
+
+=back
+
 =cut
 
 our @EXPORT_OK = qw( BIN_DIR DATA_DIR REF_DIR LIB_DIR
                      only_files runcheck simple_run_test evcheck
-                     save_output restore_output );
+                     save_output restore_output tmpnam );
 
 # Utility -----------------------------
 
 use Carp                          qw( carp croak );
 use Env                           qw( @PERL5LIB );
 use Fatal                    1.02 qw( :void close open seek sysopen unlink );
-use Fcntl                    1.03 qw( :seek );
+use Fcntl                    1.03 qw( :DEFAULT :seek );
 use File::Compare          1.1002 qw( compare );
 use File::Path             1.0403 qw( mkpath rmtree );
 use File::Spec::Functions         qw( catdir catfile updir );
@@ -150,7 +154,8 @@ use constant LIB_DIR  => catdir $Bin, updir, 'lib';
 unshift @PERL5LIB, LIB_DIR;
 unshift @INC,      LIB_DIR;
 
-my $tmpdn = tempdir(CLEANUP => ! $ENV{TEST_DEBUG});
+my $tmpdn = tempdir(CLEANUP => ( ! defined $ENV{TEST_DEBUG}     or
+                                 $ENV{TEST_DEBUG} !~ /\bSAVE\b/ ));
 mkpath $tmpdn;
 die "Couldn't create temp dir: $tmpdn: $!\n"
   unless -r $tmpdn and -w $tmpdn and -x $tmpdn and -o $tmpdn and -d $tmpdn;
@@ -158,7 +163,7 @@ chdir $tmpdn;
 
 END {
   print STDERR "Used tmp dir: $tmpdn\n"
-    if $ENV{TEST_DEBUG};
+    if defined $ENV{TEST_DEBUG} and $ENV{TEST_DEBUG} =~ /\bSAVE\b/;
 }
 
 # -------------------------------------
@@ -308,7 +313,7 @@ sub simple_run_test {
 
   ${$arg{errref}} = ''
     if exists $arg{errref};
-  my $runok = runcheck(@arg{qw(runargs name erref)});
+  my $runok = runcheck(@arg{qw(runargs name errref)});
 
   ok $runok, 1, $arg{name};
 
@@ -556,6 +561,70 @@ sub _test_save_restore_output {
   warn "Hello, Mum!";
   print 'SAVED:->:', restore_output("stderr"), ":<-\n";
   warn "to stderr 2\n";
+}
+
+# -------------------------------------
+
+=head2 tmpnam
+
+Very much like the one in L<POSIX> or L<File::Temp>, but does not get deleted
+if TEST_DEBUG has SAVE in the value.
+
+=over 4
+
+=item ARGUMENTS
+
+I<None>
+
+=item RETURNS
+
+=over 4
+
+=item name
+
+Name of temporary file name.
+
+=item fh
+
+Open filehandle to temp file, in r/w mode.  Only created & returned in list
+context.
+
+=back
+
+=back
+
+=cut
+
+my @tmpfns;
+sub tmpnam {
+  my $tmpnam = File::Temp::tmpnam;
+
+  if (@_) {
+    push @tmpfns, [ $tmpnam, $_[0] ];
+  } else {
+    push @tmpfns, $tmpnam;
+  }
+
+  if (wantarray) {
+    sysopen my $tmpfh, $tmpnam, O_RDWR | O_CREAT | O_EXCL;
+    return $tmpnam, $tmpfh;
+  } else {
+    return $tmpnam;
+  }
+}
+
+END {
+  if ( defined $ENV{TEST_DEBUG} and $ENV{TEST_DEBUG} =~ /\bSAVE\b/ ) {
+    for (@tmpfns) {
+      if ( ref $_ ) {
+        printf "Used temp file: %s (%s)\n", @$_;
+      } else {
+        print "Used temp file: $_\n";
+      }
+    }
+  } else {
+    unlink map((ref $_ ? $_->[0] : $_), @tmpfns);
+  }
 }
 
 # ----------------------------------------------------------------------------

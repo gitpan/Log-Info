@@ -104,6 +104,7 @@ use FindBin      1.42 qw( $Script );
 use IO::Handle   1.21 qw( );
 use IO::Pipe    1.121 qw( );
 use IO::Select   1.14 qw( );
+use POSIX        1.03 qw( strftime );
 use Sys::Syslog  0.01 qw( openlog closelog syslog setlogmask setlogsock );
 
 # fails under 5.6.
@@ -356,6 +357,105 @@ BEGIN {
 
 # -------------------------------------
 
+=head2 SINK_TERM_PROGRESS
+
+Here is a fine kettle of fish.
+
+This sink sniffs its filehandle (upon sink creation), and if it smells like a
+TTY, it uses it as a progress bar.  Otherwise, it just sets up a
+file/filehandle sink as usual.
+
+In progress-bar mode, incoming messages are examined.  If they look like
+
+  m!\[([\d_,.]+/[\d_,.]+|[\d_,.]+%)(\s+[^]]*)?\s+Done\]!
+
+Then that is treated as progress information, and the bar updated
+accordingly.
+
+=over 4
+
+=item ARGUMENTS
+
+=over 4
+
+=item fh
+
+Filehandle to output to, or name of file.  B<Beware>: if you present a
+filehandle, you probably want to provide a glob ref (e.g., C<\*STDERR>); the
+C<*foo{THING}> will never act as a terminal.  undef defaults to STDERR.
+
+=cut
+
+# FOR TESTING
+our ($__SINK_TERM_FORCE) = 0;
+
+sub SINK_TERM_PROGRESS {
+  eval "use Term::ProgressBar 2.00;";
+  croak sprintf("Cannot use sink %s without Term::ProgressBar present:\n  %s",
+                (caller 0)[3], $@)
+    if $@;
+
+  my ($fh) = @_;
+
+  my $fn;
+  if ( defined $fh ) {
+    if ( ! ref $fh ) {
+      $fn = $fh;
+      CORE::sysopen $fh, $fn, O_WRONLY
+          or croak "Cannot open $fh for writing: $!\n";
+    }
+  } else {
+    $fh = \*STDERR;
+  }
+
+  Term::ProgressBar->__force_term($__SINK_TERM_FORCE)
+      if $__SINK_TERM_FORCE;
+  if ( $__SINK_TERM_FORCE || -t $fh ) {
+    my ($next) = (0);
+    my $progress = Term::ProgressBar->new({count => 100, fh => $fh});
+    return 'SUBR', undef,
+           { subr => sub {
+               if ( my ($prefix, $now, $end, $percent, $suffix) =
+                    ($_[0] =~ m!(.*)
+                                \[(?:([\d_,.]+)/([\d_,.]+)  |
+                                     (?:([\d_,.]+)%))
+                                  (?:\s+[^]]*)?\s+Done\]
+                                (.*)!x) ) {
+                 tr/_,//d
+                   for grep defined, $now, $end, $percent;
+
+                 ($now, $end) = ($percent, 100)
+                   if defined $percent;
+
+                 if ( $end != $progress->target ) {
+                   $progress->target($end);
+                   $next = $progress->update($now)
+                 } else {
+                   $next = $progress->update($now)
+                     if $now >= $next;
+                 }
+
+                 if ( defined $suffix and $suffix !~ /^\s*$/ ) {
+                   s!^\s*(.*?)\s*$!$1!
+                     for grep defined, $suffix, $prefix;
+                   $progress->message("$prefix $suffix");
+                 }
+               } else {
+                 $progress->message($_[0]);
+               }
+           }
+         };
+  } else {
+    if ( defined $fn ) {
+      return 'FILE', undef, { fn => $fh };
+    } else {
+      return 'FH',   undef, { fh => $fh };
+    }
+  }
+}
+
+# -------------------------------------
+
 =head2 Default Translators
 
 Default translator units provided for communal edification.
@@ -376,11 +476,15 @@ time changes.
 use constant TRANS_UDT => sub { my $time = time;
                                 sprintf('[%d %s] %s',
                                         $time, scalar gmtime $time, $_[0]) };
+use constant TRANS_CDT =>
+  sub { my $time = time;
+        sprintf('[%s:%s] %s', strftime('%s(%d%b %H:%M:%S%z)', localtime),
+                $0, $_[0]); };
 
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.05';
+our $VERSION = '1.06';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -643,7 +747,7 @@ sub add_chan_trans {
   croak "Channel does not exist: $chan\n"
     unless exists $channel{$chan};
   croak sprintf("Translator for channel %s not a subroutine: %s\n",
-                $chan, ref $trans)
+                $chan, ref $trans || $trans)
     unless UNIVERSAL::isa ($trans, 'CODE');
 
   push @{$channel{$chan}{trans}}, $trans;
@@ -1067,7 +1171,7 @@ sub Log {
   if ( ! defined $string ) {
     my @caller = caller 1;
     $string =
-      sprintf('Log::Info: *EMPTY STRING* (called by %s::%s, at %s line %d)',
+      sprintf('Log::Info::Log *UNDEFINED* (called by %s::%s, at %s line %d)',
               @caller[0,3,1,2]);
   }
 
@@ -1175,6 +1279,26 @@ sub Logf {
   if ( ! exists $channel{$channel} ) {
     carp "Log::Info::Log : unrecognized channel: $channel\n";
     return;
+  }
+
+  if ( ! defined $format ) {
+    my @caller = caller 1;
+    Log ($channel, $level,
+         sprintf('Log::Info::Logf: sprintf format not defined ' .
+                 '(called by %s::%s, at %s line %d)',
+                 @caller[0,3,1,2]));
+    return;
+  }
+
+  if ( grep ! defined, @args ) {
+    my @caller = caller 1;
+    for (grep ! defined $args[$_], 0..$#args) {
+      Log ($channel, $level,
+           sprintf('Log::Info::Logf: format argument $_ not defined ' .
+                   '(called by %s::%s, at %s line %d)',
+                   @caller[0,3,1,2]));
+      $args[$_] = '';
+    }
   }
 
   Log ($channel, $level, sprintf $format, @args);

@@ -1,5 +1,9 @@
 Revision history for Perl extension Log::Info.
 
+1.06  Sun Mar 10  7:20PM GMT 2002
+	- Add TRANS_CDT
+	- Add SINK_TERM_PROGRESS
+
 1.05  Thu Feb 21 11:21AM GMT 2002
 	- Fix Bug #006
 	- Fix Bug #007
