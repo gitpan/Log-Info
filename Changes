@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.04
+	- Add trap_warn_die subr and tests
+
 1.03  Mon Dec 24 12:22PM GMT 2001
 	- Fix Bug #005
 	- Fix Bug #004

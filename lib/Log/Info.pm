@@ -1,3 +1,8 @@
+#Fork, capturing stderr, stdout?, others?
+#Implement log-input
+#Translator with date/time/exec name
+#Wire in Term::Progress
+
 # (X)Emacs mode: -*- cperl -*-
 
 #XXX Remove dependency to hairy Sys::Syslog
@@ -12,8 +17,8 @@ Log::Info - Single interface for log output
 
   use Log::Info qw( :DEFAULT :log_levels :default_channels );
 
-  Log  (LCN_ERROR, LOG_ERR,  "A fatal error occurred");
-  Logf (LCN_INFO,  LOG_INFO, "Loading file: %s", $filename);
+  Log  (CHAN_INFO, LOG_ERR,  "A fatal error occurred");
+  Logf (CHAN_INFO, LOG_INFO, "Loading file: %s", $filename);
 
   Log::Info::add_sink               (CHAN_STATS, 'stats-file', 'FILE',
                                      LOG_INFO,
@@ -92,12 +97,14 @@ BEGIN {
 
 # Utility -----------------------------
 
-use Carp               qw( carp croak );
-use Fatal              qw( :void close open seek sysopen );
-use Fcntl              qw( O_WRONLY O_APPEND O_CREAT );
-use FindBin            qw( $Script );
-use IO::Handle         qw( );
-use Sys::Syslog        qw( openlog closelog syslog setlogmask setlogsock );
+use Carp              qw( carp croak );
+use Fatal        1.02 qw( :void close open seek sysopen );
+use Fcntl        1.03 qw( O_WRONLY O_APPEND O_CREAT O_EXCL );
+use FindBin      1.42 qw( $Script );
+use IO::Handle   1.21 qw( );
+use IO::Pipe    1.121 qw( );
+use IO::Select   1.14 qw( );
+use Sys::Syslog  0.01 qw( openlog closelog syslog setlogmask setlogsock );
 
 # fails under 5.6.
 # require 'syslog.ph';
@@ -239,7 +246,7 @@ BEGIN {
   # Create constant subs for each log level (to export).
   for (LOG_LEVELS) {
     no strict 'refs';
-    *{join('::', __PACKAGE__, $_)} = eval "sub { LOG_LEVEL->{$_} }";
+    *{join('::', __PACKAGE__, $_)} = eval "sub() { LOG_LEVEL->{$_} }";
   }
 
   # Create constant subs for each log facility (to export).
@@ -373,7 +380,7 @@ use constant TRANS_UDT => sub { my $time = time;
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.03';
+our $VERSION = '1.04';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -395,6 +402,12 @@ END {
 =head1 PACKAGE COMPONENTS
 
 Z<>
+
+=cut
+
+# Channels -------------------------------------------------------------------
+
+=head2 CHANNELS
 
 =cut
 
@@ -558,319 +571,6 @@ Whether the name channel is known to Log::Info
 sub channel_exists { return exists $channel{$_[0]} }
 
 # -------------------------------------
-# PACKAGE FUNCTIONS
-# -------------------------------------
-
-=head1 PACKAGE FUNCTIONS
-
-Z<>
-
-=cut
-
-sub get_level {
-  my ($level) = @_;
-
-  return
-    unless defined $level;
-
-  if ( $level !~ /^-?\d+/ ) {
-    if ( exists LOG_LEVEL->{$level} ) {
-      $level = LOG_LEVEL->{$level};
-    } else {
-      croak "unrecognized level: $level\n";
-    }
-  }
-
-  return $level;
-}
-
-# -------------------------------------
-
-=head2 Log
-
-log a message
-
-=over 4
-
-=item ARGUMENTS
-
-=over 4
-
-=item channel
-
-channel to log to
-
-=item level
-
-message log level.  Only if the log level is equal to or less than the channel
-log level will it be logged.  For each sink, if the sink also has a level, the
-message will be logged to that sink only if the message level is equal to or
-below the sink level I<as well as> the channel level.
-
-=item string
-
-The string to log.  Do not append a line terminator; the sinks will do so
-themselves if necessary.
-
-=back
-
-=back
-
-=cut
-
-sub Log {
-  my ($channel, $level, $string) = @_;
-
-  croak "Log::Info::Log : unrecognized channel: $channel\n"
-    unless exists $channel{$channel};
-  $level = get_level($level);
-
-  my $details = $channel{$channel};
-
-  return
-    unless (( ! defined $channel{$channel}{level}
-              or
-              $level <= $channel{$channel}{level} )
-            and %{$details->{sinks}}
-            and grep({ my $sl = $details->{sinks}->{$_}->{level};
-                       ! defined $sl || $level <= $sl; }
-                     keys %{$details->{sinks}}));
-
-  if ( exists $details->{trans} ) {
-    my $i = 0;
-    my @trans = @{$details->{trans}};
-    while ( $i < @trans ) {
-      eval {
-        $string = $trans[$i]->($string);
-      }; if ( $@ ) {
-        warn ("Log::Info::Log : ",
-              "Bad translation unit ($i) for channel $channel: $@\n");
-      }
-      $i++;
-    }
-  }
-
- SINK:
-  while ( my ($name, $sink) = each %{$details->{sinks}} ) {
-    my ($type, $sinklevel, $trans, $values) =
-      @{$sink}{qw( type level trans values )};
-
-    # Are we below the requisite level?
-    next SINK
-      if defined $sinklevel and $level > $sinklevel;
-
-    # Any further translations?
-    my $sinkstring = $string;
-    if ( defined $trans ) {
-      my $i = 0;
-      my @trans = @$trans;
-      while ( $i < @trans ) {
-        eval {
-          $sinkstring = $trans[$i]->($sinkstring);
-        }; if ( $@ ) {
-          warn (sprintf ("Log::Info::Log : Bad translation unit " .
-                         "(%d) for channel %s sink %s: $@\n",
-                         $i, $channel, $name));
-        }
-        $i++;
-      }
-    }
-
-    if ( $type eq 'FILE' ) {
-      _log_to_file   ($values, $sinkstring, $channel, $name, $level);
-    } elsif ( $type eq 'FH' ) {
-      _log_to_fh     ($values, $sinkstring, $channel, $name, $level);
-    } elsif ( $type eq 'SUBR' ) {
-      _log_to_subr   ($values, $sinkstring, $channel, $name, $level);
-    } elsif ( $type eq 'SYSLOG' ) {
-      _log_to_syslog ($values, $sinkstring, $channel, $name, $level);
-    } else {
-      warn ("Log::Info::Log : Bad sink type ($type) for channel/name ",
-            "$channel/$name\n");
-    }
-  }
-}
-
-# -------------------------------------
-
-=head2 Logf
-
-=over 4
-
-=item ARGUMENTS
-
-=over 4
-
-=item channel
-
-As for L<Log|"Log">
-
-=item level
-
-As for L<Log|"Log">
-
-=item format
-
-As for L<sprintf/"sprintf">.
-
-=item args
-
-As for L<sprintf/"sprintf">.
-
-=back
-
-=back
-
-=cut
-
-sub Logf {
-  my ($channel, $level, $format, @args) = @_;
-
-  if ( ! exists $channel{$channel} ) {
-    carp "Log::Info::Log : unrecognized channel: $channel\n";
-    return;
-  }
-
-  Log ($channel, $level, sprintf $format, @args);
-}
-
-# Subroutines picked out from log to simplify things
-
-sub _log_to_file {
-  my ($values, $sinkstring, $channel, $name, $level) = @_;
-
-  my ($logfn, $maxsize, $fh) = @{$values}{qw( fn maxsize fh )};
-  $sinkstring .= "\n";
-
-SIZE_CHECK:
-  while (1) {
-    if ( defined $fh ) {
-      # Check if write to fh would take size past max; if so, close fh,
-      # move name to unused old name, and undefine $fh to get new one
-      # generated
-
-      # tell() doesn't work for appended filehandles :-(
-      my $fsize = (stat $fh)[7];
-      my $new_size = $fsize + length $sinkstring;
-      if ( $new_size > $maxsize and $fsize ) { # If this is this first
-                                               # message, log it whatever
-        $fh->close
-          or warn("Log::Info::Log : ",
-                  "Failure to close output log $logfn: $!\n");
-        my ($dd, $mm, $yy) = (gmtime)[3..5];
-        my $tname = sprintf ("%s-%d-%02d-%02d", $logfn,
-                             $yy+1900, $mm+1, $dd);
-        my $tail = '00';
-        $tail++
-          while -e join '-', $tname, $tail;
-        rename $logfn, join '-', $tname, $tail
-          or warn sprintf ("Log::Info::Log : " .
-                           "Failure to rename output log %s to %s: $!\n",
-                           $logfn, join '-', $tname, $tail);
-        $fh = undef;
-        delete $values->{fh};
-      } else {
-        last SIZE_CHECK;
-      }
-    }
-
-    if ( ! defined $fh ) {
-      # Open a shiny new fh, and assign it to fh
-      if ( sysopen $fh, $logfn, O_WRONLY | O_APPEND | O_CREAT ) {
-        $values->{$fh} = $fh;
-      } else {
-        warn "Log::Info::Log : Couldn't open $logfn for appending: $!\n";
-        delete_sink ($channel, $name);
-        last SIZE_CHECK;
-      }
-    }
-  }
-
-  # Write the output!
-  if ( defined $fh ) {
-    $fh->syswrite($sinkstring)
-      or warn sprintf ("Log::Info::Log : " .
-                       "Print failed on file %s (name/chan %s/%s): $!\n",
-                       $logfn, $name, $channel);
-  }
-}
-
-# -------------------------------------
-
-sub _log_to_fh {
-  my ($values, $sinkstring, $channel, $name, $level) = @_;
-
-  eval {
-    $values->{fh}->syswrite("$sinkstring\n")
-      or warn sprintf ("Log::Info::Log : " .
-                       "Print failed on filehandle %s (channel %s): $!\n",
-                       $name, $channel);
-  }; if ( $@ ) {
-    warn("Log::Info::Log : " .
-         "Print to filehandle $name on channel $channel failed:\n  $@\n");
-  }
-}
-
-# -------------------------------------
-
-sub _log_to_subr {
-  my ($values, $sinkstring, $channel, $name, $level) = @_;
-
-  eval {
-    $values->{subr}->($sinkstring);
-  }; if ( $@ ) {
-    warn("Log::Info::Log : " .
-         "Invocation of subr $name on channel $channel failed:\n  $@\n");
-  }
-}
-
-# -------------------------------------
-
-sub _log_to_syslog {
-  my ($values, $sinkstring, $channel, $name, $level) = @_;
-
-  my $sysloglevel = LOG_NAME->{$level};
-
-  if ( defined $values->{facility} ) {
-    $sysloglevel = join '|', $values->{facility}, $sysloglevel;
-  }
-
-  if ( ! defined $sysloglevel ) {
-    # Bump level up to next defined level
-  LOG_LEVEL:
-    foreach (LOG_LEVEL_VALUES) {
-      if ( $_ < $level ) {
-        $sysloglevel = LOG_NAME->{$_};
-      } else { # $_ > $level
-               # $_ != $level because ! defined $sysloglevel on loop entry
-        last LOG_LEVEL; # LOG_LEVEL_VALUES is sorted; hence all successive
-                        # values will also be > $level
-      }
-    }
-  }
-
-  if ( ! defined $sysloglevel ) {
-    # Looks like none of the values are higher.  Default to LOG_EMERG.
-    # call LOG_EMERG, then deref, just to check it's a valid level
-    $sysloglevel = LOG_NAME->{LOG_EMERG()};
-  }
-
-  # Unset log mask
-  my $oldmask = setlogmask (Sys::Syslog::LOG_UPTO(Sys::Syslog::LOG_DEBUG));
-  syslog $sysloglevel, $sinkstring;
-  setlogmask ($oldmask);
-}
-
-
-# -------------------------------------
-# PACKAGE PROCEDURES
-# -------------------------------------
-
-=head1 PACKAGE PROCEDURES
-
-Z<>
-
-=cut
 
 =head2 set_channel_out_level
 
@@ -909,9 +609,9 @@ sub set_channel_out_level {
 
 # -------------------------------------
 
-=head2 set_sink_out_level
+=head2 add_chan_trans
 
-set output cutoff level on channel
+Add a translator to a channel.
 
 =over 4
 
@@ -921,16 +621,15 @@ set output cutoff level on channel
 
 =item chan
 
-channel whose sink to amend
+The channel to add the translator to.
 
-=item sink
+=item trans
 
-sink to set output level of
-
-=item lvl
-
-level to set to; subsequent log entries will only be written if they have
-level E<lt>= lvl.
+The translator to add.  The translator will be called in order after any
+previously added translators, and will be given the results of the log string
+having been through those translators.  The results of the translation
+provided by this translator will be passed to any translators installed after
+this one, and to any sink-specific translators.
 
 =back
 
@@ -938,17 +637,23 @@ level E<lt>= lvl.
 
 =cut
 
-sub set_sink_out_level {
-  my ($chan, $sink, $level) = @_;
+sub add_chan_trans {
+  my ($chan, $trans) = @_;
 
   croak "Channel does not exist: $chan\n"
     unless exists $channel{$chan};
-  croak "Channel/Sink does not exist: $chan/$sink\n"
-    unless exists $channel{$chan}{sinks}{$sink};
-  $level = get_level($level);
+  croak sprintf("Translator for channel %s not a subroutine: %s\n",
+                $chan, ref $trans)
+    unless UNIVERSAL::isa ($trans, 'CODE');
 
-  $channel{$chan}{sinks}{$sink}{level} = $level;
+  push @{$channel{$chan}{trans}}, $trans;
 }
+
+# Sinks ----------------------------------------------------------------------
+
+=head2 SINKS
+
+=cut
 
 # -------------------------------------
 
@@ -1201,9 +906,9 @@ sub delete_sink {
 
 # -------------------------------------
 
-=head2 add_chan_trans
+=head2 set_sink_out_level
 
-Add a translator to a channel.
+set output cutoff level on channel
 
 =over 4
 
@@ -1213,15 +918,16 @@ Add a translator to a channel.
 
 =item chan
 
-The channel to add the translator to.
+channel whose sink to amend
 
-=item trans
+=item sink
 
-The translator to add.  The translator will be called in order after any
-previously added translators, and will be given the results of the log string
-having been through those translators.  The results of the translation
-provided by this translator will be passed to any translators installed after
-this one, and to any sink-specific translators.
+sink to set output level of
+
+=item lvl
+
+level to set to; subsequent log entries will only be written if they have
+level E<lt>= lvl.
 
 =back
 
@@ -1229,17 +935,19 @@ this one, and to any sink-specific translators.
 
 =cut
 
-sub add_chan_trans {
-  my ($chan, $trans) = @_;
+sub set_sink_out_level {
+  my ($chan, $sink, $level) = @_;
 
   croak "Channel does not exist: $chan\n"
     unless exists $channel{$chan};
-  croak sprintf("Translator for channel %s not a subroutine: %s\n",
-                $chan, ref $trans)
-    unless UNIVERSAL::isa ($trans, 'CODE');
+  croak "Channel/Sink does not exist: $chan/$sink\n"
+    unless exists $channel{$chan}{sinks}{$sink};
+  $level = get_level($level);
 
-  push @{$channel{$chan}{trans}}, $trans;
+  $channel{$chan}{sinks}{$sink}{level} = $level;
 }
+
+# -------------------------------------
 
 =head2 add_sink_trans
 
@@ -1288,6 +996,449 @@ sub add_sink_trans {
   push @{$channel{$chan}{sinks}{$sink}{trans}}, $trans;
 }
 
+# -------------------------------------
+# PACKAGE FUNCTIONS
+# -------------------------------------
+
+=head1 PACKAGE FUNCTIONS
+
+Z<>
+
+=cut
+
+sub get_level {
+  my ($level) = @_;
+
+  return
+    unless defined $level;
+
+  if ( $level !~ /^-?\d+/ ) {
+    if ( exists LOG_LEVEL->{$level} ) {
+      $level = LOG_LEVEL->{$level};
+    } else {
+      croak "unrecognized level: $level\n";
+    }
+  }
+
+  return $level;
+}
+
+# -------------------------------------
+
+=head2 Log
+
+log a message
+
+=over 4
+
+=item ARGUMENTS
+
+=over 4
+
+=item channel
+
+channel to log to
+
+=item level
+
+message log level.  Only if the log level is equal to or less than the channel
+log level will it be logged.  For each sink, if the sink also has a level, the
+message will be logged to that sink only if the message level is equal to or
+below the sink level I<as well as> the channel level.
+
+=item string
+
+The string to log.  Do not append a line terminator; the sinks will do so
+themselves if necessary.
+
+=back
+
+=back
+
+=cut
+
+sub Log {
+  my ($channel, $level, $string) = @_;
+
+  croak "Log::Info::Log : unrecognized channel: $channel\n"
+    unless exists $channel{$channel};
+  $level = get_level($level);
+
+  if ( ! defined $string ) {
+    my @caller = caller 1;
+    $string =
+      sprintf('Log::Info: *EMPTY STRING* (called by %s::%s, at %s line %d)',
+              @caller[0,3,1,2]);
+  }
+
+  my $details = $channel{$channel};
+
+  return
+    unless (( ! defined $channel{$channel}{level}
+              or
+              $level <= $channel{$channel}{level} )
+            and %{$details->{sinks}}
+            and grep({ my $sl = $details->{sinks}->{$_}->{level};
+                       ! defined $sl || $level <= $sl; }
+                     keys %{$details->{sinks}}));
+
+  if ( exists $details->{trans} ) {
+    my $i = 0;
+    my @trans = @{$details->{trans}};
+    while ( $i < @trans ) {
+      eval {
+        $string = $trans[$i]->($string);
+      }; if ( $@ ) {
+        warn ("Log::Info::Log : ",
+              "Bad translation unit ($i) for channel $channel: $@\n");
+      }
+      $i++;
+    }
+  }
+
+ SINK:
+  while ( my ($name, $sink) = each %{$details->{sinks}} ) {
+    my ($type, $sinklevel, $trans, $values) =
+      @{$sink}{qw( type level trans values )};
+
+    # Are we below the requisite level?
+    next SINK
+      if defined $sinklevel and $level > $sinklevel;
+
+    # Any further translations?
+    my $sinkstring = $string;
+    if ( defined $trans ) {
+      my $i = 0;
+      my @trans = @$trans;
+      while ( $i < @trans ) {
+        eval {
+          $sinkstring = $trans[$i]->($sinkstring);
+        }; if ( $@ ) {
+          warn (sprintf ("Log::Info::Log : Bad translation unit " .
+                         "(%d) for channel %s sink %s: $@\n",
+                         $i, $channel, $name));
+        }
+        $i++;
+      }
+    }
+
+    if ( $type eq 'FILE' ) {
+      _log_to_file   ($values, $sinkstring, $channel, $name, $level);
+    } elsif ( $type eq 'FH' ) {
+      _log_to_fh     ($values, $sinkstring, $channel, $name, $level);
+    } elsif ( $type eq 'SUBR' ) {
+      _log_to_subr   ($values, $sinkstring, $channel, $name, $level);
+    } elsif ( $type eq 'SYSLOG' ) {
+      _log_to_syslog ($values, $sinkstring, $channel, $name, $level);
+    } else {
+      warn ("Log::Info::Log : Bad sink type ($type) for channel/name ",
+            "$channel/$name\n");
+    }
+  }
+}
+
+# -------------------------------------
+
+=head2 Logf
+
+=over 4
+
+=item ARGUMENTS
+
+=over 4
+
+=item channel
+
+As for L<Log|"Log">
+
+=item level
+
+As for L<Log|"Log">
+
+=item format
+
+As for L<sprintf/"sprintf">.
+
+=item args
+
+As for L<sprintf/"sprintf">.
+
+=back
+
+=back
+
+=cut
+
+sub Logf {
+  my ($channel, $level, $format, @args) = @_;
+
+  if ( ! exists $channel{$channel} ) {
+    carp "Log::Info::Log : unrecognized channel: $channel\n";
+    return;
+  }
+
+  Log ($channel, $level, sprintf $format, @args);
+}
+
+# Subroutines picked out from log to simplify things
+
+sub _log_to_file {
+  my ($values, $sinkstring, $channel, $name, $level) = @_;
+
+  my ($logfn, $maxsize, $fh) = @{$values}{qw( fn maxsize fh )};
+  local $/ = "\n"; chomp $sinkstring;
+  $sinkstring .= "\n";
+
+SIZE_CHECK:
+  while (1) {
+    if ( defined $fh ) {
+      # Check if write to fh would take size past max; if so, close fh,
+      # move name to unused old name, and undefine $fh to get new one
+      # generated
+
+      # tell() doesn't work for appended filehandles :-(
+      my $fsize = (stat $fh)[7];
+      my $new_size = $fsize + length $sinkstring;
+      if ( $new_size > $maxsize and $fsize ) { # If this is this first
+                                               # message, log it whatever
+        $fh->close
+          or warn("Log::Info::Log : ",
+                  "Failure to close output log $logfn: $!\n");
+        my ($dd, $mm, $yy) = (gmtime)[3..5];
+        my $tname = sprintf ("%s-%d-%02d-%02d", $logfn,
+                             $yy+1900, $mm+1, $dd);
+        my $tail = '00';
+        $tail++
+          while -e join '-', $tname, $tail;
+        rename $logfn, join '-', $tname, $tail
+          or warn sprintf ("Log::Info::Log : " .
+                           "Failure to rename output log %s to %s: $!\n",
+                           $logfn, join '-', $tname, $tail);
+        $fh = undef;
+        delete $values->{fh};
+      } else {
+        last SIZE_CHECK;
+      }
+    }
+
+    if ( ! defined $fh ) {
+      # Open a shiny new fh, and assign it to fh
+      if ( sysopen $fh, $logfn, O_WRONLY | O_APPEND | O_CREAT ) {
+        $values->{$fh} = $fh;
+      } else {
+        warn "Log::Info::Log : Couldn't open $logfn for appending: $!\n";
+        delete_sink ($channel, $name);
+        last SIZE_CHECK;
+      }
+    }
+  }
+
+  # Write the output!
+  if ( defined $fh ) {
+    $fh->syswrite($sinkstring)
+      or warn sprintf ("Log::Info::Log : " .
+                       "Print failed on file %s (name/chan %s/%s): $!\n",
+                       $logfn, $name, $channel);
+  }
+}
+
+# -------------------------------------
+
+sub _log_to_fh {
+  my ($values, $sinkstring, $channel, $name, $level) = @_;
+
+  local $/ = "\n"; chomp $sinkstring;
+  eval {
+    $values->{fh}->syswrite("$sinkstring\n")
+      or warn sprintf ("Log::Info::Log : " .
+                       "Print failed on filehandle %s (channel %s): $!\n",
+                       $name, $channel);
+  }; if ( $@ ) {
+    warn("Log::Info::Log : " .
+         "Print to filehandle $name on channel $channel failed:\n  $@\n");
+  }
+}
+
+# -------------------------------------
+
+sub _log_to_subr {
+  my ($values, $sinkstring, $channel, $name, $level) = @_;
+
+  eval {
+    $values->{subr}->($sinkstring);
+  }; if ( $@ ) {
+    warn("Log::Info::Log : " .
+         "Invocation of subr $name on channel $channel failed:\n  $@\n");
+  }
+}
+
+# -------------------------------------
+
+sub _log_to_syslog {
+  my ($values, $sinkstring, $channel, $name, $level) = @_;
+
+  my $sysloglevel = LOG_NAME->{$level};
+
+  if ( defined $values->{facility} ) {
+    $sysloglevel = join '|', $values->{facility}, $sysloglevel;
+  }
+
+  if ( ! defined $sysloglevel ) {
+    # Bump level up to next defined level
+  LOG_LEVEL:
+    foreach (LOG_LEVEL_VALUES) {
+      if ( $_ < $level ) {
+        $sysloglevel = LOG_NAME->{$_};
+      } else { # $_ > $level
+               # $_ != $level because ! defined $sysloglevel on loop entry
+        last LOG_LEVEL; # LOG_LEVEL_VALUES is sorted; hence all successive
+                        # values will also be > $level
+      }
+    }
+  }
+
+  if ( ! defined $sysloglevel ) {
+    # Looks like none of the values are higher.  Default to LOG_EMERG.
+    # call LOG_EMERG, then deref, just to check it's a valid level
+    $sysloglevel = LOG_NAME->{LOG_EMERG()};
+  }
+
+  # Unset log mask
+  my $oldmask = setlogmask (Sys::Syslog::LOG_UPTO(Sys::Syslog::LOG_DEBUG));
+  syslog $sysloglevel, $sinkstring;
+  setlogmask ($oldmask);
+}
+
+
+# -------------------------------------
+# PACKAGE PROCEDURES
+# -------------------------------------
+
+=head1 PACKAGE PROCEDURES
+
+Z<>
+
+=cut
+
+=head2 trap_warn_die
+
+Add handlers to warn(), die(), to log messages to the log system.  Any
+existing handlers are invoked after those added.
+
+The die handler logs the message to C<CHAN_INFO> at C<LOG_ERR>.  The warn
+handler logs the message to C<CHAN_INFO> at C<LOG_WARNING>.
+
+This also traps C<Carp> messages.
+
+=over 4
+
+=item ARGUMENTS
+
+I<None>
+
+=back
+
+=cut
+
+sub trap_warn_die {
+
+  my $diehook = $SIG{__DIE__};
+  my $lastmessage = '';
+
+  $SIG{__DIE__} = sub {
+    if ( $_[0] !~ /\A[\s\n]*\Z/ ) {
+      Log(CHAN_INFO, LOG_ERR, $_[0])
+        unless $_[0] eq $lastmessage;
+      $lastmessage = $_[0];
+    }
+    $diehook->(@_)
+      if defined $diehook and UNIVERSAL::isa($diehook, 'CODE');
+  };
+
+  my $warnhook = $SIG{__WARN__};
+  $SIG{__WARN__} = sub {
+    Log(CHAN_INFO, LOG_WARNING, $_[0]);
+    $warnhook->(@_)
+      if defined $warnhook and UNIVERSAL::isa($warnhook, 'CODE');
+  };
+}
+
+# -------------------------------------
+
+=head2 enable_file_channel
+
+Set up output channel (for string based options).
+
+=over 4
+
+=item ARGUMENTS
+
+=over 4
+
+=item channel_name
+
+name of the channel to log to.
+
+=item fn
+
+value of option presented by user.  If this option looks like a simple file
+name (C<m!^[A-Za-z0-9_.\\/-]+$>), it will be treated as an output file (but
+output with the 'FH' type, so no auto-rotate, and special files will work).
+If this option looks like C<m!^:\d+!>, the numeric value will be treated as a
+file descriptor, and output sent there.  If this value is defined, but a
+blank string, then output will be sent to stderr.
+
+If this value is not defined, then no action is taken (this is to allow
+compatibility with options processors, where a value is left undefined if its
+option is never invoked).
+
+=item option_name
+
+name of the option invoked (used for error messages).
+
+=item sink_name
+
+the name of the sink to create.
+
+=back
+
+=back
+
+=cut
+
+sub enable_file_channel {
+  my ($channel_name, $fn, $option_name, $sink_name) = @_;
+
+  if ( defined $fn ) { # Else option not invoked
+    my $fh;
+    if ( $fn =~ /^\s*$/ ) {
+      $fh = *STDERR{IO};
+    } elsif ( substr($fn, 0, 1) eq ':' ) {
+      my $fd = substr($fn, 1);
+      if ( $fd =~ /^\d+/ ) {
+        unless ( CORE::open $fh, ">&=$fd" ) {
+          # Don't use Log::Info when the channels haven't opened...
+          croak "Could not open file descriptor $fd for writing: $!\n";
+        }
+      } else {
+        croak sprintf("Cannot handle non-integer file descriptor " .
+                      "argument to %s: %s", $option_name, $fn);
+      }
+    } elsif ( $fn =~ m!^[A-Za-z0-9_.\\/-]+$! ) {
+      unless ( CORE::sysopen $fh, $fn, O_CREAT | O_EXCL | O_WRONLY ) {
+        croak "Could not open file $fn for (create &) writing: $!\n";
+      }
+    } else {
+      croak "Cannot handle argument to $option_name: $fn\n";
+    }
+
+    if ( defined $fh ) {
+      add_sink($channel_name, $sink_name, 'FH', undef,
+                          { fh => $fh });
+    }
+  }
+}
+
 # ----------------------------------------------------------------------------
 
 =head1 EXAMPLES
@@ -1315,8 +1466,8 @@ Martyn J. Pearce C<fluffy@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2001 Martyn J. Pearce.  This program is free software; you can
-redistribute it and/or modify it under the same terms as Perl itself.
+Copyright (c) 2001, 2002 Martyn J. Pearce.  This program is free software; you
+can redistribute it and/or modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 

@@ -12,3 +12,9 @@ t/trans.t
 Makefile.PL
 BUGS
 t/defaults.t
+data/testfile1
+lib/Log/Info/Fork.pm
+t/enablefc.t
+t/fork_log.t
+t/test.pm
+t/trap.t

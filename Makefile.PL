@@ -1,4 +1,4 @@
-require 5.005_62;
+use v5.6.1;
 
 use Env                   qw( @PATH );
 use ExtUtils::MakeMaker;

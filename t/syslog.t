@@ -309,7 +309,9 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
   my ($ok, $skip) = (0) x 2;
 
   eval {
-    open *MAILLOG, MAILLOG
+    # Sleep here; occasionally, syslog takes a moment to catch up...
+    sleep 2;
+    open *MAILLOG, MAILLOG;
   }; if ( $@ ) {
     warn "Failed to open ${\ MAILLOG() }: $@\n"
       if $ENV{TEST_DEBUG};
