@@ -380,7 +380,7 @@ sub fork {
                 B::Deparse->new()->coderef2text($self->proc) :
                 join ' ', @{$self->proc});
     $args =~ tr/ \t\n/ /s;
-    $self->log(CHAN_INFO, LOG_INFO, SRC_INFO,
+    $self->log(CHAN_INFO, LOG_INFO+1, SRC_INFO,
                "Process Args: %s: %s", $self->name, $args);
   }
 

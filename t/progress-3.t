@@ -17,6 +17,14 @@ use test qw( DATA_DIR
 
 BEGIN {
   # 1 for compilation test,
+  eval "use Term::ProgressBar 2.00 qw( );";
+  if ( $@ ) {
+    print "1..0 # Skip: Term::ProgressBar not found\n";
+    print STDERR $@
+      if $ENV{TEST_DEBUG};
+    exit 0;
+  }
+
   plan tests  => 5,
        todo   => [],
 }

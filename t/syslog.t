@@ -119,7 +119,7 @@ Grep syslog for messages; test MESSAGE1 is present, MESSAGE2 is not.
   }; if ( $@ ) {
     warn "Failed to open ${\ SYSLOG() }: $@\n"
       if $ENV{TEST_DEBUG};
-    $skip = 1;
+    $skip = "cannot open ${\ SYSLOG() }";
   }
 
   unless ( $skip ) {
@@ -149,13 +149,7 @@ Grep syslog for messages; test MESSAGE1 is present, MESSAGE2 is not.
     }
   }
 
-  if ( $skip ) {
-    print "ok # Skip cannot open ${\ SYSLOG() }\n"
-    if $skip;
-  } else {
-    ok $ok, 1, 'test for presence of log message in syslog';
-    close *SYSLOG;
-  }
+  skip $skip, $ok, 1, 'test for presence of log message in syslog';
 }
 
 # -------------------------------------
@@ -247,7 +241,6 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
 =cut
 
 {
-# sleep 5;
   my ($ok, $skip) = (0) x 2;
 
   eval {
@@ -255,7 +248,7 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
   }; if ( $@ ) {
     warn "Failed to open ${\ SYSLOG() }: $@\n"
       if $ENV{TEST_DEBUG};
-    $skip = 1;
+    $skip = "cannot open ${\ SYSLOG() }";
   }
 
   unless ( $skip ) {
@@ -287,13 +280,7 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
     }
   }
 
-  if ( $skip ) {
-    print "ok # Skip cannot open ${\ SYSLOG() }\n"
-    if $skip;
-  } else {
-    ok $ok, 1, 'test for presence of log message in syslog (2)';
-    close *SYSLOG;
-  }
+  skip $skip, $ok, 1, 'test for presence of log message in syslog (2)';
 }
 
 # -------------------------------------
@@ -315,7 +302,7 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
   }; if ( $@ ) {
     warn "Failed to open ${\ MAILLOG() }: $@\n"
       if $ENV{TEST_DEBUG};
-    $skip = 1;
+    $skip = "cannot open ${\ MAILLOG() }\n";
   }
 
   unless ( $skip ) {
@@ -345,12 +332,6 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
     }
   }
 
-  if ( $skip ) {
-    print "ok # Skip cannot open ${\ MAILLOG() }\n"
-    if $skip;
-  } else {
-    ok $ok, 1, 'test for presence of log message in maillog';
-    close *MAILLOG;
-  }
+  skip $skip, $ok, 1, 'test for presence of log message in maillog';
 }
 

@@ -1,5 +1,10 @@
 Revision history for Perl extension Log::Info.
 
+1.11  Mon Dec  2  3:05PM GMT 2002
+	- Minor POD correction courtesy of Mike Castle <dalgoda@ix.netcom.com>
+	- Test Fixes
+	- Slight change to log levels in Log::Info::Fork
+
 1.10  Fri Aug  2  5:47PM GMT 2002
 	- Override, rather than hook, trap_warn_die
 

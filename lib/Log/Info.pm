@@ -92,7 +92,7 @@ appear twice.
 The warn handler logs the message to C<CHAN_INFO> at C<LOG_WARNING>.
 
 This also traps C<Carp> messages, I<as long as this is installed after Carp>
---- so do the C<use Carp> before the C<use Log::Info qw( :trap );
+--- so do the C<use Carp> before the C<use Log::Info qw( :trap )>;
 
 =item Log
 
@@ -531,9 +531,11 @@ time changes.
 
 =cut
 
-use constant TRANS_UDT => sub { my $time = time;
-                                sprintf('[%d %s] %s',
-                                        $time, scalar gmtime $time, $_[0]) };
+use constant TRANS_UDT =>
+  sub { my $time = time;
+        sprintf('[%d %s] %s',
+                $time, scalar gmtime $time, $_[0]) };
+
 use constant TRANS_CDT =>
   sub { my $time = time;
         sprintf('[%s:%s] %s', strftime('%s(%d%b %H:%M:%S%z)', localtime),
@@ -542,7 +544,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.10';
+our $VERSION = '1.11';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1578,6 +1580,8 @@ sub __trap_warn_die {
         /^Subroutine (\w+) redefined at $file/ and exists $redef_subr{$1};
     my $message = join '', grep defined, @_;
     Log(CHAN_INFO, LOG_WARNING, $message);
+    $warnhook->(@_)
+      if defined $warnhook and UNIVERSAL::isa($warnhook, 'CODE');
   };
 
   my $save;
