@@ -1,5 +1,9 @@
 Revision history for Perl extension Log::Info.
 
+1.20  Sat Feb 05  2:30PM GMT 2005
+	- correct enable_file_channel to consider a single numeric arg as a log level
+	  rather than a file
+
 1.19  Fri May 30  6:52PM GMT 2003
 	- Correct bug in _log_to_file causing filehandles to get consumed at
 	  a rate of one per log message!

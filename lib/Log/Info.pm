@@ -615,7 +615,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.19';
+our $VERSION = '1.20';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1740,12 +1740,13 @@ name of the channel to log to.
 
 =item fn
 
-value of option presented by user.  If this option looks like a simple file
-name (C<m!^[A-Za-z0-9_.\\/-]+$>), it will be treated as an output file (but
-output with the 'FH' type, so no auto-rotate, and special files will work).
-If this option looks like C<m!^:\d+!>, the numeric value will be treated as a
-file descriptor, and output sent there.  If this value is defined, but a
-blank string, then output will be sent to stderr.
+value of option presented by user.  If this option looks like a simple number,
+it is treated as a log level (see below).  If this option looks like a simple
+file name (C<m!^[A-Za-z0-9_.\\/-]+$>), it will be treated as an output file
+(but output with the 'FH' type, so no auto-rotate, and special files will
+work).  If this option looks like C<m!^:\d+!>, the numeric value will be
+treated as a file descriptor, and output sent there.  If this value is
+defined, but a blank string, then output will be sent to stderr.
 
 If a value of the form C<\+\d+> precedes a file descriptor, or succeeds a
 filename, then the numeric value is used to set the log level of the output
@@ -1789,7 +1790,7 @@ sub enable_file_channel {
     my $fh;
 
     my $level = LOG_INFO;
-    if ( $fn =~ s/\+(\d+)// ) {
+    if ( $fn =~ s/\+(\d+)// or $fn =~ s/^(\d+)$// ) {
       $level += $1-1;
     } else {
       my $key = join "\0", $channel_name, $sink_name;
@@ -1855,7 +1856,7 @@ Martyn J. Pearce C<fluffy@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2001, 2002, 2003 Martyn J. Pearce.  This program is free
+Copyright (c) 2001, 2002, 2003, 2005 Martyn J. Pearce.  This program is free
 software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 

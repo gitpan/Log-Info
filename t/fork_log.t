@@ -269,11 +269,10 @@ explicitly closed by the code snippet.
 =cut
 
 {
-  my $skip = ($Config{version} eq '5.8.0'              ?
-              "File descriptor use is bugged in 5.8.0" : undef);
+  my $skip = ($Config{version} ge '5.8.0'              ?
+              "File descriptor use is bugged in 5.8.0+" : undef);
   my $tempfh = tempfile;
   my $fileno = fileno $tempfh;
-
   skip($skip, evcheck(sub { Log::Info::Fork->fork_log
                               (sub {
                                  open my $tmpfh, ">&=$fileno";
@@ -321,8 +320,8 @@ descriptor to CHAN2.
 =cut
 
 {
-  my $skip = ($Config{version} eq '5.8.0'              ?
-              "File descriptor use is bugged in 5.8.0" : undef);
+  my $skip = ($Config{version} ge '5.8.0'              ?
+              "File descriptor use is bugged in 5.8.0+" : undef);
 
   my (@mess1, @mess2);
 
