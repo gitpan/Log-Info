@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.12  Thu Dec  5 11:59AM GMT 2002
+	- Fix bug with multiple :trap import complaining of redefined die
+
 1.11  Mon Dec  2  3:05PM GMT 2002
 	- Minor POD correction courtesy of Mike Castle <dalgoda@ix.netcom.com>
 	- Test Fixes

@@ -544,7 +544,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.11';
+our $VERSION = '1.12';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1549,8 +1549,8 @@ sub import {
 
 }
 
-my %redef_subr; # track of subrs intentionally redefined to exclude from
-                # warnings
+my %redef_subr = (die => 1); # track of subrs intentionally redefined to
+                             # exclude from warnings
 sub trap_warn_die {
   Log(CHAN_INFO, LOG_WARNING,
       "trap_warn_die subr deprecated; use the import tag :trap instead\n");
