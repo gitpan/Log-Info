@@ -125,6 +125,9 @@ Z<>
 
 =cut
 
+use constant ETA_ACCURACY => 5; # Update progress bar at least this often (in
+                               # seconds) to ensure ETA is up-to-date
+
 =head2 Log Levels
 
 The following constants are available for use as arguments to the C<level>
@@ -386,6 +389,7 @@ C<*foo{THING}> will never act as a terminal.  undef defaults to STDERR.
 # FOR TESTING
 our ($__SINK_TERM_FORCE) = 0;
 
+my ($last_time, $last_now);
 sub SINK_TERM_PROGRESS {
   eval "use Term::ProgressBar 2.00;";
   croak sprintf("Cannot use sink %s without Term::ProgressBar present:\n  %s",
@@ -409,7 +413,9 @@ sub SINK_TERM_PROGRESS {
       if $__SINK_TERM_FORCE;
   if ( $__SINK_TERM_FORCE || -t $fh ) {
     my ($next) = (0);
-    my $progress = Term::ProgressBar->new({count => 100, fh => $fh});
+    my $progress = Term::ProgressBar->new({count => 100,
+                                           fh    => $fh,
+                                           ETA   => 'linear'});
     return 'SUBR', undef,
            { subr => sub {
                if ( my ($prefix, $now, $end, $percent, $suffix) =
@@ -424,22 +430,36 @@ sub SINK_TERM_PROGRESS {
                  ($now, $end) = ($percent, 100)
                    if defined $percent;
 
+                 my $message_printed = 0;
+
+                 if ( defined $suffix and $suffix !~ /^\s*$/ ) {
+                   s!^\s*(.*?)\s*$!$1!
+                     for grep defined, $suffix, $prefix;
+                   if ( defined $prefix and $prefix !~ /^\s*$/ ) {
+                     $progress->message("$prefix $suffix");
+                   } else {
+                     $progress->message($suffix);
+                   }
+
+                   $message_printed = 1;
+                 }
+
                  if ( $end != $progress->target ) {
                    $progress->target($end);
                    $next = $progress->update($now)
                  } else {
                    $next = $progress->update($now)
-                     if $now >= $next;
+                     if($message_printed                  or
+                        $now >= $next                     or
+                        time >= $last_time + ETA_ACCURACY ) ;
                  }
 
-                 if ( defined $suffix and $suffix !~ /^\s*$/ ) {
-                   s!^\s*(.*?)\s*$!$1!
-                     for grep defined, $suffix, $prefix;
-                   $progress->message("$prefix $suffix");
-                 }
+                 $last_now = $now;
                } else {
                  $progress->message($_[0]);
+                 $progress->update($last_now);
                }
+             $last_time = time;
            }
          };
   } else {
@@ -481,7 +501,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.07';
+our $VERSION = '1.08';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1291,9 +1311,9 @@ sub Logf {
     my @caller = caller 1;
     for (grep ! defined $args[$_], 0..$#args) {
       Log ($channel, $level,
-           sprintf('Log::Info::Logf: format argument $_ not defined ' .
+           sprintf('Log::Info::Logf: format argument %s not defined ' .
                    '(called by %s::%s, at %s line %d)',
-                   @caller[0,3,1,2]));
+                   $_, @caller[0,3,1,2]));
       $args[$_] = '';
     }
   }

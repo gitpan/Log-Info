@@ -1,5 +1,11 @@
 Revision history for Perl extension Log::Info.
 
+1.08	Wed Jun 19 11:49PM GMT 2002
+	- SINK_TERM_PROGRESS; use linear ETA, update at least every five 
+          seconds (if called often enough), update after every message
+	- Buglet in Logf when confused by incoming fixed ($_ in q!! literal 
+	  replaced)
+
 1.07  Mon Mar 11  2:43PM GMT 2002
 	- Add hook to enable_file_channel for using SINK_TERM_PROGRESS
 
