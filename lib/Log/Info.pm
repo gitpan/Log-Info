@@ -1,6 +1,6 @@
-#Implement log-input
-
 # (X)Emacs mode: -*- cperl -*-
+
+#Implement log-input
 
 #XXX Remove dependency to hairy Sys::Syslog
 
@@ -151,6 +151,8 @@ use Sys::Syslog  0.01 qw( openlog closelog syslog setlogmask setlogsock );
 # -------------------------------------
 
 my %channel;
+our $dying;    # Set to one when calling within a caught 'die'
+our $carping;  # Set to one when calling within a caught Carpism
 
 # -------------------------------------
 # PACKAGE CONSTANTS
@@ -544,7 +546,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.12';
+our $VERSION = '1.13';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1262,6 +1264,9 @@ sub Log {
 
  SINK:
   while ( my ($name, $sink) = each %{$details->{sinks}} ) {
+    next SINK
+      if $name eq SINK_STDERR and $dying;
+
     my ($type, $sinklevel, $trans, $values) =
       @{$sink}{qw( type level trans values )};
 
@@ -1590,6 +1595,7 @@ sub __trap_warn_die {
   # Carp doesn't call die directly.  In know not how or why.  So this traps
   # calls to carp that didn't make it via the override
   $SIG{__DIE__} = sub {
+    local $dying = 1;
     my $message = join '', grep defined, @_;
       if ( $message !~ /\A[\s\n]*\Z/ ) {
         Log(CHAN_INFO, LOG_ERR, $message)
@@ -1616,6 +1622,7 @@ sub __trap_warn_die {
 
   *CORE::GLOBAL::die =
     sub {
+      local $dying = 1;
       $save = $! + 0;
       my $message = join '', grep defined, @_;
       if ( $message !~ /\A[\s\n]*\Z/ ) {
@@ -1623,7 +1630,9 @@ sub __trap_warn_die {
         # with that checked in SIG{__DIE__}, which otherwise may have an
         # "\n  at line..." appended.
         # If we want such appendages, we can add them ourselves
-        $message =~ s/\n*\z/\n/;
+        $message =~
+          s/([^\n])\z/sprintf("%s at %s line %d", $1, (caller)[1,2]) . "\n"/e;
+        $message =~ s/\n+\z/\n/;
         Log(CHAN_INFO, LOG_ERR, $message)
           unless $message eq $lastmessage;
         $lastmessage = $message;

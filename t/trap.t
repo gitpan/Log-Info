@@ -222,7 +222,7 @@ Run
                 -e => '$!=4;die"Hello"'],
                '2>', \$err],
               'exit test (die)', \$err, 4), 1,         'exit test (die) ( 1)');
-  ok $err, "Hello\nHello\n",                           'exit test (die) ( 2)';
+  ok $err, "Hello at -e line 1\n",                     'exit test (die) ( 2)';
 }
 
 # -------------------------------------
@@ -246,7 +246,7 @@ Run
                 -e => '$!=77;croak"Hello"'],
                '2>', \$err],
               'exit test (croak)', \$err, 77), 1,    'exit test (croak) ( 1)');
-  ok $err,"Hello at -e line 1\nHello at -e line 1\n",'exit test (croak) ( 2)';
+  ok $err,"Hello at -e line 1\n",'exit test (croak) ( 2)';
 }
 
 # ----------------------------------------------------------------------------

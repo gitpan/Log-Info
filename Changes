@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.13  Thu Dec  5  6:07PM GMT 2002
+	- Fix multiple stderr messages for die, warn etc.
+
 1.12  Thu Dec  5 11:59AM GMT 2002
 	- Fix bug with multiple :trap import complaining of redefined die
 

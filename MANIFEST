@@ -26,3 +26,4 @@ t/progress-3.t
 t/progress-4.t
 t/test2.pm
 t/die-warn.t
+t/single-die.t
