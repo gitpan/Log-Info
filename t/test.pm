@@ -95,6 +95,8 @@ The following symbols are exported upon request:
 
 =item LIB_DIR
 
+=item PERL
+
 =item check_req
 
 =item compare
@@ -119,7 +121,7 @@ The following symbols are exported upon request:
 
 =cut
 
-@EXPORT_OK = qw( BIN_DIR DATA_DIR REF_DIR LIB_DIR
+@EXPORT_OK = qw( BIN_DIR DATA_DIR REF_DIR LIB_DIR PERL
                  check_req compare evcheck find_exec only_files read_file
                  save_output restore_output tempdir tmpnam );
 
@@ -130,6 +132,7 @@ use Cwd                      2.01 qw( cwd );
 use Env                           qw( PATH PERL5LIB );
 use Fatal                    1.02 qw( close open seek sysopen unlink );
 use Fcntl                    1.03 qw( :DEFAULT );
+use File::Basename                qw( basename );
 use File::Compare          1.1002 qw( );
 use File::Path             1.0401 qw( mkpath rmtree );
 use File::Spec                0.6 qw( );
@@ -193,6 +196,21 @@ use constant REF_DIR  => catdir $Bin, updir, 'testref';
 use constant LIB_DIR  => catdir $Bin, updir, 'lib';
 
 use constant BUILD_SCRIPT_DIR => => catdir $Bin, updir, qw( blib script );
+
+sub find_exec {
+  my ($exec) = @_;
+
+  for (split /:/, $PATH) {
+    my $try = catfile $_, $exec;
+    return rel2abs($try)
+      if -x $try;
+  }
+  return;
+}
+
+use constant PERL     => (basename($^X) eq $^X ? 
+                          find_exec($^X)       :
+                          rel2abs($^X));
 
 # -------------------------------------
 # PACKAGE ACTIONS
@@ -1085,16 +1103,7 @@ nothing, if no such file exists.
 
 =cut
 
-sub find_exec {
-  my ($exec) = @_;
-
-  for (split /:/, $PATH) {
-    my $try = catfile $_, $exec;
-    return $try
-      if -x $try;
-  }
-  return;
-}
+# defined further up to use in constants
 
 # -------------------------------------
 

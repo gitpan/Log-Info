@@ -353,7 +353,7 @@ sub _nonipc_run {
       my ($pipe) = @_;
       for(0..$#redirects) {
         return $_
-          if $pipe == $pipes[$_];
+          if defined $pipes[$_] and $pipe == $pipes[$_];
       }
 
       return;

@@ -613,7 +613,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.14';
+our $VERSION = '1.15';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION

@@ -12,10 +12,9 @@ use FindBin 1.42 qw( $Bin );
 use Test 1.13 qw( ok plan );
 use File::Spec::Functions qw( rel2abs );
 
-use constant PERL => rel2abs $^X;
-
 use lib $Bin;
-use test2 qw( runcheck );
+use test  qw( PERL );
+use test2 qw( -no-ipc-run runcheck );
 
 BEGIN {
   # 1 for compilation test,
