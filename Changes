@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.16  Fri Dec 20 12:00PM GMT 2002
+	- Another bugfix to the redefine warnings
+
 1.15  Thu Dec 19 11:38PM GMT 2002
 	- Remove reliance on IPC::Run in test suite
 

@@ -613,7 +613,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.15';
+our $VERSION = '1.16';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1682,7 +1682,8 @@ sub __trap_warn_die {
     my $subr_name = defined $package ? "${package}::$_" : $_;
     my $subr = \&{$subr_name};
     if ( defined $subr ) {
-      $redef_subr{$subr_name} = 1;
+      # Redefined warnings do not specify the package
+      $redef_subr{$_} = 1;
       *{"$subr_name"} = sub {
         $save = $!+0;
         $subr->(@_);
