@@ -1,7 +1,4 @@
-#Fork, capturing stderr, stdout?, others?
 #Implement log-input
-#Translator with date/time/exec name
-#Wire in Term::Progress
 
 # (X)Emacs mode: -*- cperl -*-
 
@@ -484,7 +481,7 @@ use constant TRANS_CDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.06';
+our $VERSION = '1.07';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1524,6 +1521,10 @@ name of the option invoked (used for error messages).
 
 the name of the sink to create.
 
+=item term_progress
+
+I<Optional>  If true, generate a sink with SINK_TERM_PROGRESS
+
 =back
 
 =back
@@ -1531,12 +1532,12 @@ the name of the sink to create.
 =cut
 
 sub enable_file_channel {
-  my ($channel_name, $fn, $option_name, $sink_name) = @_;
+  my ($channel_name, $fn, $option_name, $sink_name, $term_progress) = @_;
 
   if ( defined $fn ) { # Else option not invoked
     my $fh;
     if ( $fn =~ /^\s*$/ ) {
-      $fh = *STDERR{IO};
+      $fh = \*STDERR;
     } elsif ( substr($fn, 0, 1) eq ':' ) {
       my $fd = substr($fn, 1);
       if ( $fd =~ /^\d+/ ) {
@@ -1544,6 +1545,7 @@ sub enable_file_channel {
           # Don't use Log::Info when the channels haven't opened...
           croak "Could not open file descriptor $fd for writing: $!\n";
         }
+        select (((select $fh), $| = 1)[0]);
       } else {
         croak sprintf("Cannot handle non-integer file descriptor " .
                       "argument to %s: %s", $option_name, $fn);
@@ -1557,8 +1559,11 @@ sub enable_file_channel {
     }
 
     if ( defined $fh ) {
-      add_sink($channel_name, $sink_name, 'FH', undef,
-                          { fh => $fh });
+      if ( $term_progress ) {
+        add_sink($channel_name, $sink_name, SINK_TERM_PROGRESS($fh));
+      } else {
+        add_sink($channel_name, $sink_name, 'FH', undef, { fh => $fh });
+      }
     }
   }
 }

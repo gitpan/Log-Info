@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.07  Mon Mar 11  2:43PM GMT 2002
+	- Add hook to enable_file_channel for using SINK_TERM_PROGRESS
+
 1.06  Sun Mar 10  7:20PM GMT 2002
 	- Add TRANS_CDT
 	- Add SINK_TERM_PROGRESS

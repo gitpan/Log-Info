@@ -22,3 +22,5 @@ make.pm
 t/def-trans.t
 t/progress-2.t
 t/progress.t
+t/progress-3.t
+t/progress-4.t
