@@ -9,12 +9,24 @@ warnings, etc. once to stderr.
 
 =cut
 
+use Config       qw( %Config );
 use FindBin 1.42 qw( $Bin );
-use Test 1.13 qw( ok plan );
+use Test    1.13 qw( ok plan );
+
+BEGIN {
+  # Timing issues in non-ipc run often screw this up.
+  eval "use IPC::Run 0.44 qw( );";
+  if ( $@ ) {
+    print STDERR "DEBUG: $@\n"
+      if $ENV{TEST_DEBUG};
+    print "1..0 # Skip: IPC::Run not found (or too old).\n";
+    exit 0;
+  }
+}
 
 use lib $Bin;
 use test  qw( PERL );
-use test2 qw( -no-ipc-run runcheck );
+use test2 qw( runcheck );
 
 BEGIN {
   # 1 for compilation test,
@@ -41,7 +53,7 @@ sub death {
     unless defined $type;
 
   my ($out, $err) = ('') x 2;
-  ok(runcheck([[PERL, @$libs, '-MLog::Info=:trap', -e => qq'$call "Blibble"'],
+  ok(runcheck([[PERL, @$libs, '-MLog::Info=:trap', -e => qq'\$!=0;$call "Blibble"'],
                '>', \$out, '2>', \$err,],
               "$name ( 1)", undef, $exit),
      1,                                                          "$name ( 1)");
@@ -59,9 +71,9 @@ sub death {
   ok $err, $expect,                                              "$name ( 3)";
 
   ($out, $err) = ('') x 2;
-  ok(runcheck([[PERL, @$libs, '-MLog::Info=:trap', -e => qq'$call "Blibble\n"'],
+  ok(runcheck([[PERL, @$libs, '-MLog::Info=:trap', -e => qq'\$!=0;$call "Blibble\n"'],
                '>', \$out, '2>', \$err,],
-              'die ( 1)', undef, $exit),
+              "$name ( 4)", undef, $exit),
      1,                                                          "$name ( 4)");
   ok $out, '',                                                   "$name ( 5)";
   $expect = "$text\n";
@@ -75,6 +87,7 @@ sub death {
 
 death('die',  'die', [], 'Blibble', 255);
 death('warn', 'warn', [], 'Blibble', 0, 1);
+
 for (qw/ carp cluck confess croak /) {
   my $exit = (($_ eq 'croak' || $_ eq 'confess') ? 255 : 0);
   my $type = ($_ eq 'confess'                    ?   2 : 0);

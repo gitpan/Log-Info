@@ -17,8 +17,19 @@ use constant PERL => rel2abs $^X;
 
 BEGIN { unshift @INC, $Bin };
 
+BEGIN {
+  # Timing issues in non-ipc run often screw this up.
+  eval "use IPC::Run 0.44 qw( );";
+  if ( $@ ) {
+    print STDERR "DEBUG: $@\n"
+      if $ENV{TEST_DEBUG};
+    print "1..0 # Skip: IPC::Run not found (or too old).\n";
+    exit 0;
+  }
+}
+
 use test      qw( LIB_DIR evcheck save_output restore_output );
-use test2     qw( -no-ipc-run runcheck );
+use test2     qw( runcheck );
 
 # Sink names for playing with
 use constant SINK1 => 'sink1';

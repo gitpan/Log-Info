@@ -1,5 +1,10 @@
 Revision history for Perl extension Log::Info.
 
+1.17  Wed Jan 22  5:26PM GMT 2002
+	- Fixes for perl 5.8.0
+	- Don't perform t/single-die.t, t/trap.t without IPC-Run, since the
+	  non-IPC-Run loop has some timing issues
+
 1.16  Fri Dec 20 12:00PM GMT 2002
 	- Another bugfix to the redefine warnings
 

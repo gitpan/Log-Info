@@ -22,6 +22,16 @@ use the cunning SINK_TERM_PROGRESS sink
 END
    },
 
+   { name    => 'IPC::Run',
+     package => 'IPC-Run',
+     version => '0.44',
+     optional => 1,
+     message => <<"END",
+IPC::Run not found.  This is not fatal, but means that some tests cannot be 
+run.
+END
+   },
+
   ];
 
 use constant EXEC_REQS =>

@@ -9,12 +9,13 @@ This package tests the C<fork_log> subr.
 =cut
 
 use Carp                        qw( carp croak );
+use Config                      qw( %Config );
 use Fatal                  1.02 qw( close open seek );
 use Fcntl                  1.03 qw( :seek );
 use File::Spec::Functions       qw( catfile );
 use File::Temp             0.12 qw( tempfile );
 use FindBin                1.42 qw( $Bin );
-use Test                   1.13 qw( ok plan );
+use Test                   1.13 qw( ok plan skip );
 
 BEGIN { unshift @INC, $Bin };
 
@@ -268,24 +269,28 @@ explicitly closed by the code snippet.
 =cut
 
 {
+  my $skip = ($Config{version} eq '5.8.0'              ?
+              "File descriptor use is bugged in 5.8.0" : undef);
   my $tempfh = tempfile;
   my $fileno = fileno $tempfh;
 
-  ok(evcheck(sub { Log::Info::Fork->fork_log
-      (sub {
-         open my $tmpfh, ">&=$fileno";
-         print $tmpfh MESSAGE5;
-         close $tmpfh;
-       }, [{ fh => $fileno, }]); },
-             'fork_log, capturing a specified filedescriptor (1)'),
-     1, 'fork_log, capturing a specified filedescriptor (1)');
+  skip($skip, evcheck(sub { Log::Info::Fork->fork_log
+                              (sub {
+                                 open my $tmpfh, ">&=$fileno";
+                                 print $tmpfh MESSAGE5;
+                                 close $tmpfh;
+                               }, [{ fh => $fileno, }]); },
+                     'fork_log, capturing a specified filedescriptor (1)'),
+       1,                'fork_log, capturing a specified filedescriptor (1)');
 
-  ok scalar(@mess), 1, 'fork_log, capturing a specified filedescriptor (2)';
-  ok $mess[0], MESSAGE5, 'fork_log, capturing a specified filedescriptor (3)';
+  skip($skip, scalar(@mess), 1, 
+                         'fork_log, capturing a specified filedescriptor (2)');
+  skip($skip, $mess[0], MESSAGE5,
+                         'fork_log, capturing a specified filedescriptor (3)');
   seek($tempfh, 0, SEEK_SET);
   local $/ = undef;
   my $tempstr = <$tempfh>;
-  ok $tempstr, '', 'fork_log, capturing a specified filehandle (4)';
+  skip $skip, $tempstr, '', 'fork_log, capturing a specified filehandle (4)';
 }
 @mess = ();
 
@@ -316,9 +321,12 @@ descriptor to CHAN2.
 =cut
 
 {
+  my $skip = ($Config{version} eq '5.8.0'              ?
+              "File descriptor use is bugged in 5.8.0" : undef);
+
   my (@mess1, @mess2);
 
-  ok(evcheck(sub {
+  skip($skip, evcheck(sub {
                Log::Info::add_channel(CHAN1, undef);
                Log::Info::add_sink   (CHAN1, SINK1, 'SUBR', undef,
                                       { subr => sub { push @mess1, $_[0] }});
@@ -332,7 +340,7 @@ descriptor to CHAN2.
   my $tempfh2 = tempfile;
   my $fileno2 = fileno $tempfh2;
 
-  ok(evcheck(sub {
+  skip($skip, evcheck(sub {
                Log::Info::Fork->fork_log (sub {
                                             print $tempfh1 MESSAGE1, "\n";
                                             open my $tmpfh, ">&=$fileno2";
@@ -348,15 +356,15 @@ descriptor to CHAN2.
              'complex use of specified descriptors (2)'),
      1, 'complex use of specified descriptors (2)');
 
-  ok scalar(@mess1), 2, 'complex use of specified descriptors (3)';
-  ok $mess1[0], MESSAGE1, 'complex use of specified descriptors (4)';
-  ok $mess1[1], MESSAGE2, 'complex use of specified descriptors (5)';
-  ok scalar(@mess2), 1, 'complex use of specified descriptors (6)';
-  ok $mess2[0], MESSAGE3, 'complex use of specified descriptors (7)';
+  skip $skip, scalar(@mess1), 2, 'complex use of specified descriptors (3)';
+  skip $skip, $mess1[0], MESSAGE1, 'complex use of specified descriptors (4)';
+  skip $skip, $mess1[1], MESSAGE2, 'complex use of specified descriptors (5)';
+  skip $skip, scalar(@mess2), 1, 'complex use of specified descriptors (6)';
+  skip $skip, $mess2[0], MESSAGE3, 'complex use of specified descriptors (7)';
   seek($tempfh1, 0, SEEK_SET);
   local $/ = undef;
   my $tempstr = <$tempfh1>;
-  ok $tempstr, '', 'complex use of specified descriptors (8)';
+  skip $skip, $tempstr, '', 'complex use of specified descriptors (8)';
 }
 
 # -------------------------------------
@@ -575,7 +583,7 @@ argument logging turned on.
      1, 'Log Process Arguments (coderef) (1)');
 
   ok scalar(@mess), 2, 'Log Process Arguments (coderef) (2)';
-  ok($mess[0], qr/^Process Args: $testname: \s*{\s*print\s+\$testline[\s;]*}$/,
+  ok($mess[0], qr/^Process Args: $testname: \s*{\s*(use\s*strict\s*'refs'\s*;\s*)?print\s+\$testline[\s;]*}$/,
      'Log Process Arguments (coderef) (3)');
   ok $mess[1], MESSAGE1, 'Log Process Arguments (coderef) (4)';
   @mess = ();

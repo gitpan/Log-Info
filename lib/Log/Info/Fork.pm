@@ -122,7 +122,7 @@ I<Optional> The level (name) to log at.  Defaults to C<LOG_INFO>.
 =back
 
 If not defined, defaults to logging stdout to CHAN_INFO at LOG_INFO, and
-stderr to CHAN_INFO at LOG_WARN.
+stderr to CHAN_INFO at LOG_WARNING.
 
 =item log_opts
 
@@ -248,7 +248,7 @@ sub init {
   my $self = shift;
   my %args = @_;
 
-  my @fhs = ({fh      => *STDERR{IO}, name  => 'stderr',},
+  my @fhs = ({fh      => *STDERR{IO}, name  => 'stderr', level => LOG_WARNING},
              {fh      => *STDOUT{IO}, name  => 'stdout',},);;
 
   if ( exists $args{fhs} ) {
@@ -410,7 +410,7 @@ sub fork {
     # Set process group for potential infanticide
     setpgrp;
 
-    open($_->{fh}, '>& ' . $_->{pipe}->fileno), $_->{fh}->autoflush
+    open($_->{fh}, '>&' . $_->{pipe}->fileno), $_->{fh}->autoflush
       for $self->fhs;
 
     eval {
@@ -456,7 +456,7 @@ sub pump_all {
 
       croak "Whoa!  Where did this FH come from? $fh\n"
         unless defined $fh_info;
-      
+
       $outname = $fh_info->{name};
       $bufr = \$fh_info->{linebuf};
 
@@ -532,8 +532,8 @@ Martyn J. Pearce C<fluffy@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002 Martyn J. Pearce.  This program is free software; you can
-redistribute it and/or modify it under the same terms as Perl itself.
+Copyright (c) 2002, 2003 Martyn J. Pearce.  This program is free software; you
+can redistribute it and/or modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 

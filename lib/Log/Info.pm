@@ -613,7 +613,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.16';
+our $VERSION = '1.17';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1063,7 +1063,7 @@ sub add_sink {
     {
       no strict 'refs';
       croak
-        sprintf ("facility %s unrecognized for channel/sink %s/%s: %s\n",
+        sprintf ("facility '%s' unrecognized for channel/sink %s/%s\n",
                  $values{facility}, $chan, $name)
           if defined $values{facility} and
             ! grep &$_ eq $values{facility}, LOG_FACILITIES;
@@ -1647,11 +1647,17 @@ sub __trap_warn_die {
 
   $SIG{__WARN__} = sub {
     # Nasty hack to avoid irritating mandatory redefine warnings bug
-    return
-      if ( ( $_[0] =~ /^Subroutine ([:\w]+) redefined at $file/ ) and 
-           ( exists $redef_subr{$1} or 
-             ( index($1,':') == -1 and exists $redef_subr{"main::$1"} )
-           ) );
+    if ( my ($subrname) = ($_[0] =~ /^Subroutine ([:\w]+) redefined at $file/ )
+       ) {
+      if ( exists $redef_subr{$subrname}             or
+           ( index($subrname,':') == -1 and
+             exists $redef_subr{"main::$subrname"} ) or
+           ( $subrname =~ /^(?:main|CORE::GLOBAL)::([a-z_]\w+)$/ and
+             exists $redef_subr{$1} )
+         ) {
+        return;
+      }
+    }
     my $message = join '', grep defined, @_;
     Log(CHAN_INFO, LOG_WARNING, $message);
     $warnhook->(@_)
@@ -1679,11 +1685,10 @@ sub __trap_warn_die {
   # Override Carp messages if present
   for (qw( croak confess )) {
     no strict 'refs';
-    my $subr_name = defined $package ? "${package}::$_" : $_;
+    my $subr_name = defined $package ? "${package}::$_" : "main::$_";
     my $subr = \&{$subr_name};
     if ( defined $subr ) {
-      # Redefined warnings do not specify the package
-      $redef_subr{$_} = 1;
+      $redef_subr{$subr_name} = $redef_subr{$_} = 1;
       *{"$subr_name"} = sub {
         $save = $!+0;
         $subr->(@_);
@@ -1848,8 +1853,9 @@ Martyn J. Pearce C<fluffy@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2001, 2002 Martyn J. Pearce.  This program is free software; you
-can redistribute it and/or modify it under the same terms as Perl itself.
+Copyright (c) 2001, 2002, 2003 Martyn J. Pearce.  This program is free
+software; you can redistribute it and/or modify it under the same terms as
+Perl itself.
 
 =head1 SEE ALSO
 
