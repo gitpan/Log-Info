@@ -342,8 +342,8 @@ BEGIN {
     *{join('::', __PACKAGE__, $_)} = sub { $name };
   }
 
-  push @EXPORT_OK, DEFAULT_CHANNELS;
-  $EXPORT_TAGS{default_channels}        = [ DEFAULT_CHANNELS, SINK_STDERR ];
+  push @EXPORT_OK, DEFAULT_CHANNELS, 'SINK_STDERR';
+  $EXPORT_TAGS{default_channels}        = [ DEFAULT_CHANNELS, 'SINK_STDERR' ];
 }
 
 # -------------------------------------
@@ -372,7 +372,7 @@ use constant TRANS_UDT => sub { my $time = time;
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.00';
+our $VERSION = '1.01';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION

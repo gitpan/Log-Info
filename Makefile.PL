@@ -1,10 +1,11 @@
+require 5.005_62;
+
 use Env                   qw( @PATH );
 use ExtUtils::MakeMaker;
 use File::Spec::Functions qw( catfile );
 
 #XXX check against pmcompat
 
-require 5.005_62;
 use strict;
 use constant MOD_REQS =>
   [

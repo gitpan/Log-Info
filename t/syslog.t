@@ -127,9 +127,9 @@ Grep syslog for messages; test MESSAGE1 is present, MESSAGE2 is not.
       chomp;
       my ($date, $hostname, $prog, $pid, $message);
       if ( ($date, $hostname, $prog, $pid, $message) =
-           # Trim whitespace at end of line; Sys::Syslog adds a space after 
+           # Trim whitespace at end of line; Sys::Syslog adds a space after
            # each logged line.
-               /^(\w{3}\ \d{1,2}\ \d{2}:\d{2}:\d{2})
+               /^(\w{3}\ [\d ]\d\ \d{2}:\d{2}:\d{2})
                  \ (\S+)\ (.+?)(?:\[(\d+)\])?:\ (.*?)\s*$/x ) {
         if ( $prog eq $Script and defined $pid and $pid == $$ ) {
           if ( $message eq MESSAGE2 ) {
@@ -263,9 +263,9 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
       chomp;
       my ($date, $hostname, $prog, $pid, $message);
       if ( ($date, $hostname, $prog, $pid, $message) =
-           # Trim whitespace at end of line; Sys::Syslog adds a space after 
+           # Trim whitespace at end of line; Sys::Syslog adds a space after
            # each logged line.
-               /^(\w{3}\ \d{1,2}\ \d{2}:\d{2}:\d{2})
+               /^(\w{3}\ [\d ]\d\ \d{2}:\d{2}:\d{2})
                  \ (\S+)\ (.+?)(?:\[(\d+)\])?:\ (.*?)\s*$/x ) {
         if ( $prog eq $Script and defined $pid and $pid == $$ ) {
           if ( $message eq MESSAGE1 ) {
@@ -321,9 +321,9 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
       chomp;
       my ($date, $hostname, $prog, $pid, $message);
       if ( ($date, $hostname, $prog, $pid, $message) =
-           # Trim whitespace at end of line; Sys::Syslog adds a space after 
+           # Trim whitespace at end of line; Sys::Syslog adds a space after
            # each logged line.
-               /^(\w{3}\ \d{1,2}\ \d{2}:\d{2}:\d{2})
+               /^(\w{3}\ [\d ]\d\ \d{2}:\d{2}:\d{2})
                  \ (\S+)\ (.+?)(?:\[(\d+)\])?:\ (.*?)\s*$/x ) {
         if ( $prog eq $Script and defined $pid and $pid == $$ ) {
           if ( $message eq MESSAGE2 ) {
