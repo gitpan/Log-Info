@@ -1,5 +1,8 @@
 Revision history for Perl extension Log::Info.
 
+1.18  Wed Mar 19  4:34PM GMT 2002
+	- Don't check exitcode of 'date' in TRANS_CDT
+
 1.17  Wed Jan 22  5:26PM GMT 2002
 	- Fixes for perl 5.8.0
 	- Don't perform t/single-die.t, t/trap.t without IPC-Run, since the

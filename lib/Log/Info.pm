@@ -579,7 +579,9 @@ use constant TRANS_UDT =>
           local $/ = undef;
           open *DATE, "$date --version 2>&1 |";
           $date_version = <DATE>;
-          close *DATE;
+          # Don't check the return code; it'll often be >0 since we're
+          # running a utility (--version)
+          CORE::close *DATE;
         }
 
         if ( $date_version =~ m/^date \(GNU.*\) ([\d.]+)$/m ) {
@@ -613,7 +615,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.17';
+our $VERSION = '1.18';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
