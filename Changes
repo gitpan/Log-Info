@@ -1,6 +1,9 @@
 Revision history for Perl extension Log::Info.
 
-1.20  Sat Feb 05  2:30PM GMT 2005
+1.21  Sat Feb  5  5:24PM GMT 2005
+	- Return log level from enable_file_channel (relative to LOG_INFO-1)
+
+1.20  Sat Feb  5  2:30PM GMT 2005
 	- correct enable_file_channel to consider a single numeric arg as a log level
 	  rather than a file
 

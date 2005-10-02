@@ -615,7 +615,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.20';
+our $VERSION = '1.21';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -1826,6 +1826,8 @@ sub enable_file_channel {
         add_sink($channel_name, $sink_name, 'FH', $level, { fh => $fh });
       }
     }
+
+    return $level - (LOG_INFO - 1);
   }
 }
 
