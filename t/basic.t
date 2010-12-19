@@ -8,17 +8,14 @@ This package tests the basic functionality of Log::Info
 
 =cut
 
-use Test                  qw( ok plan );
+use Test::More            tests => 10, import => [qw( diag is ok )];
+
+use FindBin               qw( $Bin );
+use lib  "$Bin/../lib";
 
 # Channel names for playing with
 use constant TESTCHAN1 => 'testchan1';
 use constant TESTCHAN2 => 'testchan2';
-
-BEGIN {
-  plan tests  => 10;
-       todo   => [],
-       ;
-}
 
 use Log::Info;
 
@@ -29,7 +26,7 @@ successfully.
 
 =cut
 
-ok 1, 1, 'compilation';
+is 1, 1, 'compilation';
 
 =head2 Test 2: adding a channel
 
@@ -37,18 +34,8 @@ This test adds a channel.  The test is that all this occurs without error.
 
 =cut
 
-{
-  my $ok = 1;
-  eval {
-    Log::Info::add_channel (TESTCHAN1);
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'adding a channel';
-}
+Log::Info::add_channel (TESTCHAN1);
+ok 1, 'adding a channel';
 
 =head2 Test 3: channel exists
 
@@ -56,18 +43,7 @@ The test is that the channel just created exists as per Log::Info
 
 =cut
 
-{
-  my $ok = 0;
-  eval {
-    $ok = Log::Info::channel_exists (TESTCHAN1);
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'channel exists';
-}
+ok Log::Info::channel_exists (TESTCHAN1), 'channel exists';
 
 =head2 Test 4: writing to an open channel
 
@@ -93,19 +69,8 @@ The test is that a write occurs without throwing an exception
 
 =cut
 
-{
-  my $ok = 0;
-  eval {
-    Log (TESTCHAN1, 5, 'random text');
-    $ok = 1;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'writing to an open channel';
-}
+Log (TESTCHAN1, 5, 'random text');
+ok 1, 'writing to an open channel';
 
 =head2 Test 5: adding a channel again
 
@@ -115,14 +80,14 @@ thrown.
 =cut
 
 {
-  my $ok = 1;
+  my $ok = 0;
   eval {
     Log::Info::add_channel (TESTCHAN1);
   }; if ( $@ ) {
-    $ok = 0;
+    $ok = ( $@ =~ /^Channel already exists: / )
+      or diag "\$\@: $@";
   }
-
-  ok $ok, 0, 'adding a channel again';
+  ok $ok, 'adding a channel again';
 }
 
 =head2 Test 6: deleting a known channel
@@ -131,18 +96,8 @@ This test deletes the added channel.  The test is that no exception is thrown.
 
 =cut
 
-{
-  my $ok = 1;
-  eval {
-    Log::Info::delete_channel (TESTCHAN1);
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'deleting a known channel';
-}
+Log::Info::delete_channel (TESTCHAN1);
+ok 1, 'deleting a known channel';
 
 =head2 Test 7: channel does not exist
 
@@ -150,18 +105,7 @@ The test is that the channel just deleted does not exist as per Log::Info
 
 =cut
 
-{
-  my $ok = 0;
-  eval {
-    $ok = ! Log::Info::channel_exists (TESTCHAN1);
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'channel does not exist';
-}
+ok ! Log::Info::channel_exists (TESTCHAN1), 'channel does not exist';
 
 =head2 Test 8: deleting an unknown channel
 
@@ -175,10 +119,10 @@ thrown.
   eval {
     Log::Info::delete_channel (TESTCHAN1);
   }; if ( $@ ) {
-    $ok = 1;
+    $ok = ( $@ =~ /^Channel does not exist: / )
+      or diag "\$\@: $@";
   }
-
-  ok $ok, 1, 'deleting an unknown channel';
+  ok $ok, 'deleting an unknown channel';
 }
 
 =head2 Test 9: writing to a deleted channel
@@ -193,10 +137,10 @@ thrown.
   eval {
     Log (TESTCHAN1, 5, 'random text');
   }; if ( $@ ) {
-    $ok = 1;
+    $ok = ( $@ =~ /^no such Log::Info channel / )
+      or diag "\$\@: $@";
   }
-
-  ok $ok, 1, 'writing to a deleted channel';
+  ok $ok, 'writing to a deleted channel';
 }
 
 =head2 Test 10: writing to a never-existed channel
@@ -211,9 +155,9 @@ exception is thrown.
   eval {
     Log (TESTCHAN2, 5, 'random text');
   }; if ( $@ ) {
-    $ok = 1;
+    $ok = ( $@ =~ /^no such Log::Info channel / )
+      or diag "\$\@: $@";
   }
-
-  ok $ok, 1, 'writing to a never-existed channel';
+  ok $ok, 'writing to a never-existed channel';
 }
 

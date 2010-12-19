@@ -35,6 +35,8 @@ BEGIN {
        ;
 }
 
+use lib $Script, '..', 'lib';
+
 =head2 Test 1: compilation
 
 This test confirms that the test script and the modules it calls compiled
@@ -46,7 +48,6 @@ the C<use> call for C<Log::Info>.
 =cut
 
 use Log::Info qw( :DEFAULT :log_levels :syslog_facilities );
-
 ok 1, 1, 'compilation';
 
 # -------------------------------------
@@ -90,8 +91,8 @@ Test that no exception is thrown.
   my $read;
 
   eval {
-    Log(TESTCHAN1, LOG_ERR,    MESSAGE1);
-    Log(TESTCHAN1, LOG_NOTICE, MESSAGE2);
+    Logf(TESTCHAN1, LOG_ERR,    "[%d] %s", $$, MESSAGE1);
+    Logf(TESTCHAN1, LOG_NOTICE, "[%d] %s", $$, MESSAGE2);
     $ok = 1;
   }; if ( $@ ) {
     print STDERR "Test failed:\n$@\n"
@@ -227,8 +228,8 @@ Test that no exception is thrown.
   my $read;
 
   eval {
-    Log(TESTCHAN2, LOG_WARNING, MESSAGE2);
-    Log(TESTCHAN2, LOG_CRIT,    MESSAGE3);
+    Logf(TESTCHAN2, LOG_WARNING, "[%d] %s", $$, MESSAGE2);
+    Logf(TESTCHAN2, LOG_CRIT,    "[%d] %s", $$, MESSAGE3);
     $ok = 1;
   }; if ( $@ ) {
     print STDERR "Test failed:\n$@\n"
@@ -266,8 +267,8 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
            # Trim whitespace at end of line; Sys::Syslog adds a space after
            # each logged line.
                /^(\w{3}\ [\d ]\d\ \d{2}:\d{2}:\d{2})
-                 \ (\S+)\ (.+?)(?:\[(\d+)\])?:\ (.*?)\s*$/x ) {
-        if ( $prog eq $Script and defined $pid and $pid == $$ ) {
+                 \ (\S+)\ (.+?):\ (?:\[(\d+)\])\ (.*?)\s*$/x ) {
+        if ( $prog eq $0 and defined $pid and $pid == $$ ) {
           if ( $message eq MESSAGE1 ) {
             # Ignore; consequence of previous test
           } elsif ( $message eq MESSAGE2 ) {
@@ -280,7 +281,7 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
               if $ENV{TEST_DEBUG};
           }
         }
-      } elsif ( $ENV{TEST_DEBUG} ) {
+      } elsif ( $ENV{TEST_DEBUG} > 1 ) {
         warn "Couldn't match syslog line $.:\n  $_\n"
           unless /last message repeated \d+ times$/;
       }
@@ -320,8 +321,8 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
            # Trim whitespace at end of line; Sys::Syslog adds a space after
            # each logged line.
                /^(\w{3}\ [\d ]\d\ \d{2}:\d{2}:\d{2})
-                 \ (\S+)\ (.+?)(?:\[(\d+)\])?:\ (.*?)\s*$/x ) {
-        if ( $prog eq $Script and defined $pid and $pid == $$ ) {
+                 \ (\S+)\ (.+?):\ (?:\[(\d+)\])\ (.*?)\s*$/x ) {
+        if ( $prog eq $0 and defined $pid and $pid == $$ ) {
           if ( $message eq MESSAGE2 ) {
             $ok = -1;
           } elsif ( $message eq MESSAGE3 ) {
@@ -332,7 +333,7 @@ Grep syslog for messages; test MESSAGE3 is present, MESSAGE2 is not.
               if $ENV{TEST_DEBUG};
           }
         }
-      } elsif ( $ENV{TEST_DEBUG} ) {
+      } elsif ( $ENV{TEST_DEBUG} > 1 ) {
         warn "Couldn't match mailllog line $.:\n  $_\n"
           unless /last message repeated \d+ times$/;
       }

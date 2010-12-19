@@ -154,7 +154,6 @@ This is to check that nothing is messing with die by default.
   }
   ok $ok, 1, 'checking that die is now trapped (1)';
 }
-
 ok scalar(@mess), 1, 'checking that die is now trapped (2)';
 ok $mess[0], MESSAGE1 . "\n", 'checking that die is now trapped (3)';
 ok $@, MESSAGE1 . "\n", 'checking that die is now trapped (4)';
@@ -236,7 +235,7 @@ Run
                 -e => '$!=4;die"Hello"'],
                '2>', \$err],
               'exit test (die)', \$err, 4), 1,         'exit test (die) ( 1)');
-  ok $err, "Hello at -e line 1\n",                     'exit test (die) ( 2)';
+  ok $err, "Hello at -e line 1\n",                      'exit test (die) ( 2)';
 }
 
 # -------------------------------------
@@ -260,7 +259,7 @@ Run
                 -e => '$!=77;croak"Hello"'],
                '2>', \$err],
               'exit test (croak)', \$err, 77), 1,    'exit test (croak) ( 1)');
-  ok $err,"Hello at -e line 1\n",'exit test (croak) ( 2)';
+  ok $err,"Hello at -e line 1\n",                     'exit test (croak) ( 2)';
 }
 
 # ----------------------------------------------------------------------------

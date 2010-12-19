@@ -11,9 +11,13 @@ This package tests the translator functionality of Log::Info
 use Fatal                 qw( close open read seek );
 use Fcntl                 qw( SEEK_END );
 use File::Glob            qw( );
+use File::Spec::Functions qw( catdir updir );
+use FindBin               qw( $Bin );
 use IO::Select            qw( );
 use POSIX                 qw( tmpnam );
 use Test                  qw( ok plan );
+
+use lib catdir $Bin, updir, 'lib';
 
 # Channel names for playing with
 use constant TESTCHAN1 => 'testchan1';

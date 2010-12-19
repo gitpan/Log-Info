@@ -8,8 +8,11 @@ This package tests the defaults of Log::Info
 
 =cut
 
-use POSIX qw( tmpnam );
-use Test  qw( ok plan );
+use FindBin  qw( $Bin );
+use POSIX    qw( tmpnam );
+use Test     qw( ok plan );
+
+use lib  "$Bin/../lib";
 
 # Channel names for playing with
 use constant TESTCHAN1 => 'testchan1';
@@ -97,6 +100,7 @@ The test is that no exception is thrown.
 {
   my $ok = 0;
   eval {
+    Log::Info::set_channel_out_level(CHAN_INFO, LOG_INFO);
     Log::Info::set_sink_out_level(CHAN_INFO, SINK_STDERR, LOG_INFO);
     $ok = 1;
   }; if ( $@ ) {

@@ -138,7 +138,7 @@ use File::Path             1.0401 qw( mkpath rmtree );
 use File::Spec                0.6 qw( );
 use FindBin                  1.42 qw( $Bin );
 use POSIX                    1.02 qw( );
-use Test                    1.122 qw( ok skip );
+use Test::More                    import => [qw( diag is is_deeply ok skip )];
 
 # ----------------------------------------------------------------------------
 
@@ -346,8 +346,7 @@ sub evcheck {
     &$code;
     $ok = 1;
   }; if ( $@ ) {
-    carp "Code $name failed: $@\n"
-      if $ENV{TEST_DEBUG};
+    diag "Code $name failed: $@\n";
     $ok = 0;
   }
 
@@ -739,7 +738,7 @@ BEGIN {
     for ( grep ! defined, $fn1, $fn2 ) {
       carp 'Usage: compare({fn1 => $fn1, fn2 => $fn2, name => "some name"})' ."\n"
           if $ENV{TEST_DEBUG};
-      ok 0, 1, $name
+      is 0, 1, $name
         unless $notest;
       return -8;
     }
@@ -761,7 +760,7 @@ BEGIN {
       }
 
       if ( $err ) {
-        ok 0, 1, $name
+        is 0, 1, $name
           unless $notest;
         return -$err;
       }
@@ -801,7 +800,7 @@ BEGIN {
           sprintf("More files (%d) in $name2 than $name1 (%d)\n",
                   scalar @list2, scalar @list1)
           if $ENV{TEST_DEBUG};
-        ok @list1, @list2, $name
+        is_deeply \@list1, \@list2, $name
           unless $notest;
         return 0;
       } elsif ( @list1 > @list2 ) {
@@ -809,7 +808,7 @@ BEGIN {
           sprintf("More files (%d) in $name1 than $name2 (%d)\n",
                   scalar @list1, scalar @list2)
           if $ENV{TEST_DEBUG};
-        ok @list1, @list2, $name
+        is_deeply \@list1, \@list2, $name
           unless $notest;
         return 0;
       }
@@ -818,13 +817,13 @@ BEGIN {
         if ( $list1[$i] lt $list2[$i] ) {
           carp "File $list1[$i] is present in $name1 but not $name2\n"
             if $ENV{TEST_DEBUG};
-          ok $list1[$i], $list2[$i], $name
+          is $list1[$i], $list2[$i], $name
             unless $notest;
           return 0;
         } elsif ( $list1[$i] gt $list2[$i] ) {
           carp "File $list2[$i] is present in $name2 but not $name1\n"
             if $ENV{TEST_DEBUG};
-          ok $list2[$i], $list1[$i], $name
+          is $list2[$i], $list1[$i], $name
             unless $notest;
           return 0;
         }
@@ -847,13 +846,13 @@ BEGIN {
         unless ( $ok >= 1 ) {
           carp qq'Difference found testing file "$fn" in tars $name1 ($tmp1), $name2 ($tmp2)\n'
             if $ENV{TEST_DEBUG};
-          ok 0, 1, $name
+          is 0, 1, $name
             unless $notest;
           return 0;
         }
       }
 
-      ok 1, 1, $name
+      is 1, 1, $name
         unless $notest;
       return 1;
     }
@@ -874,7 +873,7 @@ BEGIN {
     }
 
     unless ( File::Compare::compare($fn1, $fn2) ) {
-      ok 1, 1, $name
+      is 1, 1, $name
         unless $notest;
       return 1;
     }
@@ -952,7 +951,7 @@ END
       close $fh2;
     }
 
-    ok 0, 1, $name
+    is 0, 1, $name
       unless $notest;
     return 0;
   }

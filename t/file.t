@@ -8,12 +8,18 @@ This package tests the file-writing functionality of Log::Info
 
 =cut
 
+use autodie               qw( close open );
+use Data::Dumper          qw( Dumper );
 use Fatal                 qw( close open read seek );
 use Fcntl                 qw( SEEK_END );
+use FindBin               qw( $Bin );
 use File::Glob            qw( );
 use IO::Select            qw( );
+use List::Util            qw( max );
 use POSIX                 qw( tmpnam );
-use Test                  qw( ok plan );
+use Test::More            tests => 29;
+
+use lib  "$Bin/../lib";
 
 # Channel names for playing with
 use constant TESTCHAN1 => 'testchan1';
@@ -26,8 +32,8 @@ use constant SINK2 => 'sink2';
 # Message texts for playing with
 # Tests rely on no "\n" in these
 # Each message to be distinct for searching
-use constant MESSAGE1   => 'Cuthbert';
-use constant MESSAGE2   => 'Dibble';
+use constant MESSAGE1   => 'Message1';
+use constant MESSAGE2   => 'Message2';
 use constant MAXMESSLEN => ((length(MESSAGE1) > length(MESSAGE2)) ?
                             length(MESSAGE1) : length(MESSAGE2));
 
@@ -47,18 +53,37 @@ use constant TRANS2 => sub { scalar(reverse($_[0])) . $_[0] };
 
 use constant TMPNAM1 => tmpnam;
 use constant TMPNAM2 => tmpnam;
-
-BEGIN {
-  plan tests  => 21;
-       todo   => [],
-       ;
-}
+use constant TMPNAM3 => tmpnam;
 
 END {
-  unlink map glob("$_*"), TMPNAM1, TMPNAM2;
+  unlink map glob("$_*"), TMPNAM1, TMPNAM2, TMPNAM3
+    unless $ENV{TEST_SAVE_FILES};
 }
 
+$Data::Dumper::Maxdepth = 3;
+$Data::Dumper::Terse    = 1;
+$Data::Dumper::Indent   = 0;
+
 use Log::Info qw( :DEFAULT :log_levels );
+
+$/ = "\n";
+
+# -------------------------------------
+
+sub slurp {
+  my ($fn) = @_;
+
+  my @lines;
+  open my $fh, '<', $fn;
+  while ( my $_ = <$fh> ) {
+    chomp $_;
+    push @lines, $_;
+  }
+  close $fh;
+  return \@lines;
+}
+
+# -------------------------------------
 
 =head2 Test 1: compilation
 
@@ -70,7 +95,7 @@ C<Log::Info>.
 
 =cut
 
-ok 1, 1, 'compilation';
+is 1, 1, 'compilation';
 
 =head2 Test 2: set up pipe to fh
 
@@ -93,6 +118,10 @@ my ($in, $out);
     select((select($out), $| = 1)[0]);
     Log::Info::add_channel (TESTCHAN1, 3);
     Log::Info::add_sink    (TESTCHAN1, SINK1, 'FH', undef, { fh => $out });
+    diag 'fileno $in: '  . fileno($in)
+      if $ENV{TEST_DEBUG};
+    diag 'fileno $out: ' . fileno($out)
+      if $ENV{TEST_DEBUG};
     $ok = 1;
   }; if ( $@ ) {
     print STDERR "Test failed:\n$@\n"
@@ -100,7 +129,7 @@ my ($in, $out);
     $ok = 0;
   }
 
-  ok $ok, 1, 'set up pipe to fh';
+  is $ok, 1, 'set up pipe to fh';
 }
 
 =head2 Test 3: log to fh
@@ -117,10 +146,9 @@ exception is thrown).
   my $read;
 
   eval {
-    Log(TESTCHAN1, 4, MESSAGE1);
-    Log(TESTCHAN1, 3, MESSAGE2);
+    Log(TESTCHAN1, 4, MESSAGE1); # should not log to fh
+    Log(TESTCHAN1, 3, MESSAGE2); # should log to fh
 
-    local $/ = "\n";
     local $SIG{ALRM} = sub { die "Timed out reading from pipe\n" }; alarm 2;
     $read = <$in>;
     alarm 0;
@@ -131,12 +159,13 @@ exception is thrown).
     $ok = 0;
   }
 
-  ok $read, (MESSAGE2 . "\n"), 'log to fh';
+  is $read, (MESSAGE2 . "\n"), 'log to fh';
 }
 
 =head2 Test 4: set up sink to file
 
 Create a channel TESTCHAN2 with sink SINK2 connected to a temporary file.
+Neither the sink nor the channel have any limits
 
 Test no exception thrown.
 
@@ -148,6 +177,11 @@ Test no exception thrown.
     Log::Info::add_channel (TESTCHAN2);
     Log::Info::add_sink    (TESTCHAN2, SINK2, 'FILE', undef,
                             { fn => TMPNAM1 });
+    diag 'TMPNAM1: ', TMPNAM1
+      if $ENV{TEST_DEBUG};
+    # so now we have
+    #   TESTCHAN1 => SINK1 (3;FH),
+    #   TESTCHAN2 => SINK2 (;FILE:TMPNAM1)
     $ok = 1;
   }; if ( $@ ) {
     print STDERR "Test failed:\n$@\n"
@@ -155,7 +189,7 @@ Test no exception thrown.
     $ok = 0;
   }
 
-  ok $ok, 1, 'set up sink to file';
+  is $ok, 1, 'set up sink to file';
 }
 
 =head2 Test 5: log to file
@@ -170,7 +204,7 @@ Test log written.
   my $read;
 
   eval {
-    Log(TESTCHAN2, 4, MESSAGE1);
+    Log(TESTCHAN2, 4, MESSAGE1); # should log to file
 
     open *TMPFH, TMPNAM1;
     local $/ = undef;
@@ -181,7 +215,7 @@ Test log written.
       if $ENV{TEST_DEBUG};
   }
 
-  ok $read, (MESSAGE1 . "\n"), 'log to file';
+  is $read, (MESSAGE1 . "\n"), 'log to file';
 }
 
 =head2 Test 6: add filelog to TESTCHAN1
@@ -197,10 +231,13 @@ Test no exception thrown.
   my $ok = 0;
   eval {
     Log::Info::add_sink (TESTCHAN1, SINK2, 'FILE', 2,
-                         { fn => TMPNAM1 });
-    Log(TESTCHAN1, 1, MESSAGE1);
-    Log(TESTCHAN1, 3, MESSAGE2);
-
+                         { fn => TMPNAM3 });
+    # so now we have
+    #   TESTCHAN1//SINK1 (3;FH),
+    #   TESTCHAN1//SINK2 (2;FILE:TMPNAM3), 
+    #   TESTCHAN2//SINK2 (;FILE:TMPNAM1)
+    Log(TESTCHAN1, 1, MESSAGE1); # should go to fh & file
+    Log(TESTCHAN1, 3, MESSAGE2); # should go to fh only
     $ok = 1;
   }; if ( $@ ) {
     print STDERR "Test failed:\n$@\n"
@@ -208,7 +245,7 @@ Test no exception thrown.
     $ok = 0;
   }
 
-  ok $ok, 1, 'set up sink to file';
+  is $ok, 1, 'add filelog to TESTCHAN1';
 }
 
 =head2 Test 7: dual log to fh (1)
@@ -222,7 +259,6 @@ Test MESSAGE1 logged to SINK1.
   my $read;
 
   eval {
-    local $/ = "\n";
     local $SIG{ALRM} = sub { die "Timed out reading from pipe\n" }; alarm 2;
     $read = <$in>;
     alarm 0;
@@ -232,7 +268,7 @@ Test MESSAGE1 logged to SINK1.
     $ok = 0;
   }
 
-  ok $read, (MESSAGE1 . "\n"), 'dual log to fh (1)';
+  is $read, (MESSAGE1 . "\n"), 'dual log to fh (1)';
 }
 
 =head2 Test 8: dual log to fh (2)
@@ -246,7 +282,6 @@ Test MESSAGE2 logged to SINK1.
   my $read;
 
   eval {
-    local $/ = "\n";
     local $SIG{ALRM} = sub { die "Timed out reading from pipe\n" }; alarm 2;
     $read = <$in>;
     alarm 0;
@@ -256,12 +291,10 @@ Test MESSAGE2 logged to SINK1.
     $ok = 0;
   }
 
-  ok $read, (MESSAGE2 . "\n"), 'dual log to fh (2)';
+  is $read, (MESSAGE2 . "\n"), 'dual log to fh (2)';
 }
 
-=head2 Test 9: dual log to file
-
-Test MESSAGE1 logged to file after MESSAGE1 logged by test 5.
+=head2 Test 9: log to two files
 
 =cut
 
@@ -269,21 +302,11 @@ Test MESSAGE1 logged to file after MESSAGE1 logged by test 5.
   my $ok = 0;
   my $read;
 
-  eval {
-    open *TMPFH, TMPNAM1;
-    local $/ = undef;
-    $read = <TMPFH>;
-    close *TMPFH;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $read, (MESSAGE1 . "\n" . MESSAGE1 . "\n"), 'dual log to file';
+  is_deeply slurp(TMPNAM1), [ MESSAGE1 ], 'log to two files (1)';
+  is_deeply slurp(TMPNAM3), [ MESSAGE1 ], 'log to two files (2)';
 }
 
-=head2 Test 10: delete fh sink from channel
+=head2 Test 11: delete fh sink from channel
 
 delete SINK1 from TESTCHAN1
 
@@ -306,10 +329,10 @@ test no exception thrown
     $ok = 0;
   }
 
-  ok $ok, 1, 'delete fh sink from channel';
+  is $ok, 1, 'delete fh sink from channel';
 }
 
-=head2 Test 11: message not logged to deleted channel
+=head2 Test 12: message not logged to deleted channel
 
 Test nothing to read on $in
 
@@ -326,32 +349,10 @@ Test nothing to read on $in
       if $ENV{TEST_DEBUG};
   }
 
-  ok $#ready, -1, 'message not logged to deleted channel';
+  is $#ready, -1, 'message not logged to deleted channel';
 }
 
-=head2 Test 12: message logged to file
-
-Test last line of F<tmpfile> is MESSAGE2.
-
-=cut
-
-{
-  my @read;
-
-  eval {
-    open *TMPFH, TMPNAM1;
-    local $/ = "\n";
-    chomp (@read = <TMPFH>);
-    close *TMPFH;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-  }
-
-  ok $read[-1], MESSAGE2, 'message logged to file';
-}
-
-=head2 Test 13: delete file sink from channel
+=head2 Test 14: delete file sink from channel
 
 test no exception thrown
 
@@ -369,10 +370,10 @@ test no exception thrown
     $ok = 0;
   }
 
-  ok $ok, 1, 'delete file sink from channel';
+  is $ok, 1, 'delete file sink from channel';
 }
 
-=head2 Test 14: add size-limited file sinks to channel, log series of messages
+=head2 Test 15: add size-limited file sinks to channel, log series of messages
 
 Truncate TMPNAM{1,2}.
 
@@ -384,7 +385,8 @@ Use translators to test sizes account for translation, too.
 
 =cut
 
-my $messagecount = 1+int(MAXMAXSIZE / (length(MESSAGE1)+length(MESSAGE2)));
+my $messagecount = 2* 1+int(MAXMAXSIZE / (length(MESSAGE1)+3));
+my @expect;
 
 {
   my $ok = 0;
@@ -402,183 +404,74 @@ my $messagecount = 1+int(MAXMAXSIZE / (length(MESSAGE1)+length(MESSAGE2)));
     Log::Info::add_chan_trans(TESTCHAN1, TRANS1);
     Log::Info::add_sink_trans(TESTCHAN1, SINK1, TRANS2);
 
+    my $suffix = 'aaa';
     for ((undef) x $messagecount) {
-      Log(TESTCHAN1, 0, MESSAGE1);
-      Log(TESTCHAN1, 0, MESSAGE2);
+      my $msg = MESSAGE1 . $suffix++;
+      Log(TESTCHAN1, 0, $msg);
+      push @expect, $msg;
     }
 
     $ok = 1;
   }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
+    diag "test exception: $@";
     $ok = 0;
   }
 
-  ok $ok, 1, 'add size-limited file sinks to channel, log series of messages';
+  is $ok, 1, 'add size-limited file sinks to channel, log series of messages';
 }
 
-my @tmpnam1 = map glob("$_*"), TMPNAM1;
+my @tmpnam1 = (TMPNAM1, map glob("$_.*"), TMPNAM1);
 @tmpnam1    = @tmpnam1[1..$#tmpnam1,0]; # files in descending age order
 my @tmpnam2 = map glob("$_*"), TMPNAM2;
 @tmpnam2    = @tmpnam2[1..$#tmpnam2,0]; # files in descending age order
 
-=head2 Test 15: all messages logged to rotated sink1
+=head2 Test 16: all messages logged to rotated sink1
+
+=cut
+
+is_deeply [map @{slurp($_)}, reverse sort @tmpnam1],
+          [map join('++++',(scalar reverse $_), $_), @expect];
+
+=head2 Test 17: all messages logged to rotated sink2
+
+=cut
+
+is_deeply [map @{slurp($_)}, reverse sort @tmpnam2], [map '++' . $_, @expect];
+
+=head2 Test 18: log rotated at appropriate size (sink1)
+
+Test: each file to be less than or equal to MAXSIZE1+messagesize in size, and
+for every file other than the last, the first message of the next file should
+have taken them over the limit.
+
+Log::Dispatch::FileRotate checks the size, if it's less than max, writes the
+message; else pre-rotates.  Hence, the size may exceed the max by up to max
+message size.
 
 =cut
 
 {
   my $ok = 0;
 
-  eval {
-    my %count;
-    local $/ = "\n";
-    my $last;
-    for my $tmpnam (@tmpnam1) {
-      open *TMPFH, $tmpnam;
-      while (<TMPFH>) {
-        if ( index($_, MESSAGE1) >= 0 ) {
-          die "Expected MESSAGE2\n"
-            if defined $last and $last eq MESSAGE1;
-            $count{MESSAGE1()}++;
-            $last = MESSAGE1;
-        } elsif ( index($_, MESSAGE2) >= 0 ) {
-          die "Expected MESSAGE1\n"
-            unless $last eq MESSAGE1;
-            $count{MESSAGE2()}++;
-            $last = MESSAGE2;
-        } else {
-          die "Got bad log line: $_\n";
-        }
-      }
-      close *TMPFH;
-    }
-    $ok = $count{MESSAGE1()} == $messagecount &&
-          $count{MESSAGE2()} == $messagecount;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
+  for my $x ([\@tmpnam1, MAXSIZE1, 1], [\@tmpnam2, MAXSIZE2, 2]) {
+    my ($tmpnams, $minsize) = @$x;
+    my $maxsize = $minsize + max map length, MESSAGE1, MESSAGE2;
 
-  ok $ok, 1, 'all messages logged to rotated sink1';
-}
-
-=head2 Test 16: all messages logged to rotated sink2
-
-=cut
-
-{
-  my $ok = 0;
-
-  eval {
-    my %count;
-    local $/ = "\n";
-    my $last;
-    for my $tmpnam (@tmpnam2) {
-      open *TMPFH, $tmpnam;
-      while (<TMPFH>) {
-        if ( index($_, MESSAGE1) >= 0 ) {
-          die "Expected MESSAGE2\n"
-            if defined $last and $last eq MESSAGE1;
-            $count{MESSAGE1()}++;
-            $last = MESSAGE1;
-        } elsif ( index($_, MESSAGE2) >= 0 ) {
-          die "Expected MESSAGE1\n"
-            unless $last eq MESSAGE1;
-            $count{MESSAGE2()}++;
-            $last = MESSAGE2;
-        } else {
-          die "Got bad log line: $_\n";
-        }
-      }
-      close *TMPFH;
-    }
-    $ok = $count{MESSAGE1()} == $messagecount &&
-          $count{MESSAGE2()} == $messagecount;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'all messages logged to rotated sink2';
-}
-
-=head2 Test 17: log rotated at appropriate size (sink1)
-
-Test: each file to be less than or equal to MAXSIZE1 in size, and for every
-file other than the last, the first message of the next file should have taken
-them over the limit.
-
-=cut
-
-{
-  my $ok = 0;
-
-  eval {
-    for (my $i = 0; $i < @tmpnam1; $i++) {
-      $_ = $tmpnam1[$i];
+    for (my $i = 0; $i < @$tmpnams; $i++) {
+      $_ = $tmpnams->[$i];
       my $size = -s $_;
-      die sprintf("File %s too large: %d\n", $_, $size)
-        if $size > MAXSIZE1;
-      if ( $i < $#tmpnam1 ) {
-        my $nextfn = $tmpnam1[$i+1];
-        local $/ = "\n";
-        open *FH, $nextfn;
-        my $line = <FH>;
-        close *FH;
-        die sprintf("Message could have fitted into %s (%d): %s (%d)\n",
-                    $_, $size, $line, length($line))
-          if ( ($size + length($line)) <= MAXSIZE1 );
-      }
+      ok $size <= $maxsize, "x File $_ size $size <= $maxsize"
+        or diag Dumper +{ map {; $_ => -s $_ } @$tmpnams};
+      ok $i == $#$tmpnams || $size >= $minsize, "x File $_ size $size > $minsize"
+        or diag Dumper +{ minsize => $minsize, 
+                          maxsize => $maxsize, 
+                          x => $x->[2] },
+                       +{ map {; $_ => -s $_ } @$tmpnams };
     }
-    $ok = 1;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
   }
-
-  ok $ok, 1, 'log rotated at appropriate size (sink1)';
 }
 
-=head2 Test 18: log rotated at appropriate size (sink2)
-
-As for Test 17, for sink2
-
-=cut
-
-{
-  my $ok = 0;
-
-  eval {
-    for (my $i = 0; $i < @tmpnam2; $i++) {
-      $_ = $tmpnam2[$i];
-      my $size = -s $_;
-      die sprintf("File %s too large: %d\n", $_, $size)
-        if $size > MAXSIZE2;
-      if ( $i < $#tmpnam2 ) {
-        my $nextfn = $tmpnam2[$i+1];
-        local $/ = "\n";
-        open *FH, $nextfn;
-        my $line = <FH>;
-        close *FH;
-        die sprintf("Message could have fitted into %s (%d): %s (%d)\n",
-                    $_, $size, $line, length($line))
-          if ( ($size + length($line)) <= MAXSIZE2 );
-      }
-    }
-    $ok = 1;
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
-
-  ok $ok, 1, 'log rotated at appropriate size (sink2)';
-}
-
-=head2 Test 19: log switch at whole logged message point (sink1)
+=head2 Test 20: log switch at whole logged message point (sink1)
 
 for each output file from SINK1, test that the last character is a newline
 
@@ -604,10 +497,10 @@ for each output file from SINK1, test that the last character is a newline
     $ok = 0;
   }
 
-  ok $ok, 1, 'log switch at whole logged message point (sink1)';
+  is $ok, 1, 'log switch at whole logged message point (sink1)';
 }
 
-=head2 Test 20: log switch at whole logged message point (sink2)
+=head2 Test 21: log switch at whole logged message point (sink2)
 
 for each output file from SINK2, test that the last character is a newline
 
@@ -633,10 +526,10 @@ for each output file from SINK2, test that the last character is a newline
     $ok = 0;
   }
 
-  ok $ok, 1, 'log switch at whole logged message point (sink2)';
+  is $ok, 1, 'log switch at whole logged message point (sink2)';
 }
 
-=head2 Test 21: no messages logged to deleted fh sink
+=head2 Test 22: no messages logged to deleted fh sink
 
 Test nothing to read on $in
 
@@ -653,5 +546,5 @@ Test nothing to read on $in
       if $ENV{TEST_DEBUG};
   }
 
-  ok $#ready, -1, 'no messages logged to deleted fh sink';
+  is $#ready, -1, 'no messages logged to deleted fh sink';
 }

@@ -10,6 +10,9 @@ This package tests the error-checking in Log::Info
 
 use Test                  qw( ok plan );
 
+use FindBin               qw( $Bin );
+use lib  "$Bin/../lib";
+
 # Channel names for playing with
 use constant TESTCHAN1 => 'testchan1';
 

@@ -1,114 +1,61 @@
 # (X)Emacs mode: -*- cperl -*-
 
-#Implement log-input
-
-#XXX Remove dependency to hairy Sys::Syslog
-
 package Log::Info;
 
 =head1 NAME
 
-Log::Info - Single interface for log output
-
-=head1 SYNOPSIS
-
-  use Log::Info qw( :DEFAULT :log_levels :default_channels );
-
-  Log  (CHAN_INFO, LOG_ERR,  "A fatal error occurred");
-  Logf (CHAN_INFO, LOG_INFO, "Loading file: %s", $filename);
-
-  Log::Info::add_sink               (CHAN_STATS, 'stats-file', 'FILE',
-                                     LOG_INFO,
-                                     { fn => "$ENV{HOME}/stats",
-                                       maxsize => 10 * 1024**2, # 1M,
-                                     });
-
-  Log::Info::add_sink               (CHAN_DEBUG, 'stderr', 'FH', LOG_INFO,
-                                     { fh => *STDERR{IO} })
-    if $opt_debug;
-
-  Log::Info::set_sink_out_level     (CHAN_INFO, SINK_STDERR, LOG_INFO);
-
-  Log::Info::add_channel            ('MYLOG', $fh);
-  Log::Info::set_channel_out_level  ('MYLOG', LOG_WARNING);
-  Log::Info::add_sink               ('MYLOG', 'mysink', 'FILE', LOG_ERR,
-                                     { fn => '/tmp/mylog' });
-  Log                               ('MYLOG', LOG_INFO, 'I got to here...');
-  Log::Info::delete_sink            ('MYLOG', 'outf');
-  Log::Info::delete_channel         ('MYLOG');
+Log::Info - Wrapper around Log::Log4perl
 
 =head1 DESCRIPTION
 
-Log::Info is intended to be a single interface for all logging action.  Each
-instance of Log::Info is intended to be an output for a particular type of
-log; some defaults are provided, and custom ones may be generated.
+This tool is now just a wrapper around Log::Log4perl.  The author recommends
+that you use that module instead; this module is maintained purely to provide
+a migration path thereto.
 
-Log::Info exports functions C<Log> and C<Logf> by default.
+All documentation for using Log::Info has been excised, except for that which
+will aid migration.
 
-=head2 Concepts
+=head1 SYNOPSIS
 
-Log::Info is a package, not a class.  There is only one logging mechanism in a
-running program; this is considered to be a good thing.  Log::Info knows of
-I<channels>, which have I<sinks>; channels are named log facilities, whilst
-sinks are the output points.
+  use Log::Info  qw( :log_levels :default_channels Log Logf );
 
-The idea is that modules each log their messages to some (set of) channels,
-each channel representing some type of message (general information,
-statistics, progress, etc.), and the controlling script just sets the output
-levels and directions of the sinks according to configuration.  Thus, the
-communication between the script and the modules is somewhat simplified.
+  # The Log::Info default channels appear in Log::Log4perl as loggers called
+  # colon-lowercase-<channelname>, e.g., INFO appears as ':info'.
+  #
+  # note, use init, not init_once, since Log::Info has already called init
+  # if you have used :default_channels to auto-create the default channels
+  # (or else contrived to call Log() or Logf() already)
+  Log::Log4perl::init
+    (+{
+       'log4perl.rootLogger' => 'WARN, tempfile',
 
-Under these circumstances, the module need only call
-L<Log|"Log">/L<Logf|"Logf"> directly, and whether it is used as part of a
-daemon process logging to syslog, or a standalone unit dumping errors to
-stderr, the choices are made purely by the calling script.
+       'log4perl.appender.tempfile'                          =>
+         'Log::Log4perl::Appender::File',
+       'log4perl.appender.tempfile.filename'                 => $tempfn,
+       'log4perl.appender.tempfile.layout'                   =>
+         'Log::Log4perl::Layout::PatternLayout',
+       'log4perl.appender.tempfile.layout.ConversionPattern' =>
+         '[%P:%p] %F >%c< - %m%n',
 
-The only thing left to decide is policy, regarding what messages are sent to
-which channel, and at what level.  The module enforces no policy, but does
-attempt to provide a start point in a set of default channels, and a little
-suggested guidance on the use of levels within those channels.  This is
-intended to be helpful; any suggestions to enhance these to be more so are
-welcomed by the author.
+       'log4perl.logger.:info'                               => 'INFO',
+       'log4perl.appender.:info'                             =>
+         'Log::Log4perl::Appender::Screen',
+       'log4perl.appender.:info.stderr'                      => 1,
+       'log4perl.appender.:info.layout'                      =>
+         'Log::Log4perl::Layout::PatternLayout',
+       'log4perl.appender.:info.layout.ConversionPattern'    =>
+         '[%r] %F %L %c - %m%n',
+      });
 
-For those wishing to use a different set of policies for whatever reason,
-channel creation, etc. are all completely available to the user.
+  # you can still call Log, Logf, in the old Log::Info style,
+  # just for migration...
+  Log(CHAN_INFO, LOG_ERR, 'this is an error message');
 
-=head2 EXPORTS
+  # ...but now you should use Log::Log4perl
+  Log::Log4perl->get_logger->warn('l1 warn');
+  # here we can even use the Log::Info 
+  Log::Log4perl->get_logger(':info')->warn('l2 warn');
 
-All items are exported on request, except where noted
-
-=over 4
-
-=item :trap
-
-Not really an export, but a pragma.  Add handlers to warn(), die(), to log
-messages to the log system.
-
-The die handler logs the message to C<CHAN_INFO> at C<LOG_ERR>.  The die
-message is still propogated up the call stack, so will typically appear on
-stderr.  If CHAN_INFO is directed to stderr, then the error message will
-appear twice.
-
-The warn handler logs the message to C<CHAN_INFO> at C<LOG_WARNING>.
-
-This also traps C<Carp> messages, I<as long as this is installed after Carp>
---- so do the C<use Carp> before the C<use Log::Info qw( :trap )>;
-
-=item Log
-
-B<Exported by default>
-
-=item Logf
-
-B<Exported by default>
-
-=item :log_levels
-
-=item :syslog_facilities
-
-=item :default_channels
-
-=back
 
 =cut
 
@@ -116,7 +63,7 @@ B<Exported by default>
 
 # Pragmas -----------------------------
 
-require 5.005_62;
+use 5.10.0;
 use strict;
 use warnings;
 
@@ -140,11 +87,15 @@ use FindBin                1.42 qw( $Script );
 use IO::Handle             1.21 qw( );
 use IO::Pipe              1.121 qw( );
 use IO::Select             1.14 qw( );
+use List::Util                  qw( min max );
+use Log::Log4perl               qw( );
 use POSIX                  1.03 qw( strftime );
 use Sys::Syslog            0.01 qw( openlog closelog syslog setlogmask setlogsock );
 
-# fails under 5.6.
-# require 'syslog.ph';
+use Log::Info::SubAppender  qw( );
+# can't use the full name of the RHS below with a ->{} form if the {} contain
+# a $var because CVS tries to expand...
+my $LOGGERS_BY_NAME = $Log::Log4perl::Logger::LOGGERS_BY_NAME;
 
 # ----------------------------------------------------------------------------
 
@@ -154,120 +105,40 @@ use Sys::Syslog            0.01 qw( openlog closelog syslog setlogmask setlogsoc
 
 my %channel;
 our $dying;    # Set to one when calling within a caught 'die'
-our $carping;  # Set to one when calling within a caught Carpism
 
 # -------------------------------------
 # PACKAGE CONSTANTS
 # -------------------------------------
 
-=head1 PACKAGE CONSTANTS
-
-Z<>
-
-=cut
-
 use constant ETA_ACCURACY => 5; # Update progress bar at least this often (in
                                # seconds) to ensure ETA is up-to-date
 
-=head2 Log Levels
-
-The following constants are available for use as arguments to the C<level>
-attribute of the L<Log|"Log"> or L<Logf|"Logf"> call (listed in descending
-order).  The constants are stolen shamelessly from L<syslog>, and all are
-guranteed to be valid levels for a C<SYSLOG>-type sink.  All of these
-constants will be imported inidividually on request, or grouped together with
-the C<:log_levels> tag.
-
-=over 4
-
-=item LOG_EMERG
-
-system is unusable
-
-=item LOG_ALERT
-
-action must be taken immediately
-
-=item LOG_CRIT
-
-critical conditions
-
-=item LOG_ERR
-
-error conditions
-
-=item LOG_WARNING
-
-warning conditions
-
-=item LOG_NOTICE
-
-normal, but significant, condition
-
-=item LOG_INFO
-
-informational message
-
-=item LOG_DEBUG
-
-debug-level message
-
-=back
-
-=cut
-
-# All valid syslog levels (this is required by SYSLOG type documentation).
 use constant LOG_LEVELS       => qw( LOG_EMERG   LOG_ALERT  LOG_CRIT LOG_ERR
                                      LOG_WARNING LOG_NOTICE LOG_INFO
                                      LOG_DEBUG );
 
-=head2 Log facilities
 
-The following constants are available for use as arguments to the C<facility>
-attribute of the C<SYSLOG> sink type.  All of these constants will be imported
-inidividually on request, or grouped together with the C<:syslog_facilities>
-tag.
+# translate our levels to Log4perl
+use Log::Log4perl::Level   qw( );
+use Log::Log4perl::Logger  qw( );
+BEGIN {
+  Log::Log4perl::Logger::create_custom_level('NOTICE', 'WARN');
+  Log::Log4perl::Level::add_priority('EMERG',
+                                     4 * Log::Log4perl::Level::to_priority('FATAL'),
+                                    );
+  Log::Log4perl::Level::add_priority('ALERT',
+                                     3 * Log::Log4perl::Level::to_priority('FATAL'),
+                                     1, 6,
+                                    );
+  Log::Log4perl::Level::add_priority('CRIT',
+                                     2 * Log::Log4perl::Level::to_priority('FATAL'),
+                                    );
+}
 
-=over 4
-
-=item FTY_AUTHPRIV
-
-=item FTY_CRON
-
-=item FTY_DAEMON
-
-=item FTY_LPR
-
-=item FTY_MAIL
-
-=item FTY_NEWS
-
-=item FTY_SYSLOG
-
-=item FTY_USER
-
-=item FTY_UUCP
-
-=item FTY_LOCAL0
-
-=item FTY_LOCAL1
-
-=item FTY_LOCAL2
-
-=item FTY_LOCAL3
-
-=item FTY_LOCAL4
-
-=item FTY_LOCAL5
-
-=item FTY_LOCAL6
-
-=item FTY_LOCAL7
-
-=back
-
-=cut
-
+# The following constants are available for use as arguments to the
+# C<facility> attribute of the C<SYSLOG> sink type.  All of these constants
+# will be imported inidividually on request, or grouped together with the
+# C<:syslog_facilities> tag.
 use constant LOG_FACILITIES   => qw( FTY_AUTHPRIV FTY_CRON
                                      FTY_DAEMON FTY_LPR FTY_MAIL FTY_NEWS
                                      FTY_SYSLOG FTY_USER FTY_UUCP
@@ -276,17 +147,37 @@ use constant LOG_FACILITIES   => qw( FTY_AUTHPRIV FTY_CRON
                                      FTY_LOCAL6 FTY_LOCAL7
                                    );
 
-use constant LOG_LEVEL        => { map { $_ => Sys::Syslog::xlate($_) }
+# here we translate LOG_ALL to LOG_DEBUG, for the sake of syslog which
+# has no LOG_ALL.
+use constant LOG_LEVEL        => { LOG_ALL =>  Sys::Syslog::xlate('LOG_DEBUG'),
+                                   map { $_ => Sys::Syslog::xlate($_) }
                                        LOG_LEVELS
                                  };
 use constant LOG_NAME         => { reverse %{LOG_LEVEL()} };
+
+use constant LOG4PERL_LEVELMAP => +{qw( LOG_EMERG    EMERG
+                                        LOG_ALERT    ALERT
+                                        LOG_CRIT     FATAL
+                                        LOG_ERR      ERROR
+                                        LOG_WARNING  WARN
+                                        LOG_NOTICE   NOTICE
+                                        LOG_INFO     INFO
+                                        LOG_DEBUG    DEBUG
+                                        LOG_ALL      ALL
+                                   )};
+
+use constant LOG4PERL_LEVELS => +{
+                                  map {; LOG_LEVEL->{$_} =>
+                                         Log::Log4perl::Level::to_priority(LOG4PERL_LEVELMAP->{$_}) }
+                                       LOG_LEVELS
+                                 };
 
 # In ascending numeric order
 use constant LOG_LEVEL_VALUES => sort { $a <=> $b } values %{LOG_LEVEL()};
 
 BEGIN {
   # Create constant subs for each log level (to export).
-  for (LOG_LEVELS) {
+  for (LOG_LEVELS, 'LOG_ALL') {
     no strict 'refs';
     *{join('::', __PACKAGE__, $_)} = eval "sub() { LOG_LEVEL->{$_} }";
   }
@@ -558,22 +449,6 @@ use constant TRANS_UDT =>
         next
           unless -x $date;
 
-#         pipe my ($read, $write);
-#         die "fork failed: $!\n"
-#           unless defined (my $pid = fork);
-#
-#         if ( $pid ) { # Parent
-#           close $write;
-#           print STDERR $_
-#             for <$read>;
-#         } else {      # Child
-#           close $read;
-#           open STDOUT, '>&=', fileno $write;
-#           open STDERR, '>&=', fileno $write;
-#
-#           exec $date, '--version';
-#         }
-
         my $date_version = qx( $date --version 2>&1 );
         {
           local $/ = undef;
@@ -602,6 +477,8 @@ use constant TRANS_UDT =>
     $! = $save;
   } # end if ( $check eq '%z' )
 
+  # TRANS_CDT: [1285701228(28Sep 19:13:48+0000):./def-trans.t] Dibble
+  #             epochtime     time+TZ           script($0)     msg
   use constant TRANS_CDT =>
     sub { my $time = time;
           die "Cannot determine timezone info.  Sorry.  Perhaps installing gnu date will help\n"
@@ -615,7 +492,7 @@ use constant TRANS_UDT =>
 # -------------------------------------
 
 our $PACKAGE = 'Log-Info';
-our $VERSION = '1.21';
+our $VERSION = '2.00';
 
 # -------------------------------------
 # PACKAGE CONSTRUCTION
@@ -633,12 +510,6 @@ END {
 # -------------------------------------
 # PACKAGE COMPONENTS
 # -------------------------------------
-
-=head1 PACKAGE COMPONENTS
-
-Z<>
-
-=cut
 
 # Channels -------------------------------------------------------------------
 
@@ -701,7 +572,7 @@ Create a new channel.
 
 =item chan
 
-name of channel
+name of channel.  Translates directly to a Log::Log4perl channel name.
 
 =item level
 
@@ -716,19 +587,21 @@ messages.
 
 sub add_channel {
   my ($chan, $level) = @_;
-
-  $level = LOG_NOTICE()
-    unless @_ >= 2;
+  if ( ! defined $level ) {
+    if ( 1 == @_ ) { # true default
+      $level = LOG_NOTICE();
+    } else { # undef was passed
+      $level = LOG_ALL();
+    }
+  }
 
   croak "Invalid channel name :->$chan<-\n"
     unless $chan =~ /^[\w-]+$/ or caller eq __PACKAGE__;
 
   croak "Channel already exists: $chan\n"
     if exists $channel{$chan};
-
-  $channel{$chan} = { sinks => {},
-                      level => $level,
-                    };
+  $channel{$chan} = Log::Log4perl->get_logger($chan);
+  $channel{$chan}->level(LOG4PERL_LEVELS->{$level});
 }
 
 BEGIN {
@@ -771,6 +644,7 @@ sub delete_channel {
   delete_sink($chan, $_)
     for keys %{$channel{$chan}{sinks}};
   delete $channel{$chan};
+  delete $LOGGERS_BY_NAME->{$chan};
 }
 
 # -------------------------------------
@@ -835,11 +709,14 @@ level E<lt>= lvl.
 sub set_channel_out_level {
   my ($chan, $level) = @_;
 
-  croak "Channel does not exist: $chan\n"
-    unless exists $channel{$chan};
-  $level = get_level($level);
-
-  $channel{$chan}->{level} = $level;
+  my $logger = Log::Log4perl->get_logger($chan)
+    or croak "Channel does not exist: $chan\n";
+  if ( defined $level ) {
+    $logger->level(LOG4PERL_LEVELS->{$level} // _generate_l4p_level($level));
+  } else {
+    $logger->level('ALL');
+  }
+  $logger->set_output_methods;
 }
 
 # -------------------------------------
@@ -873,7 +750,10 @@ this one, and to any sink-specific translators.
 =cut
 
 sub add_chan_trans {
-  my ($chan, $trans) = @_;
+  my ($chan, $trans, $name) = @_;
+
+  state $trans_name = 'aaa';
+  $name //= join ':', qw( trans chan ), $chan, $trans_name++;
 
   croak "Channel does not exist: $chan\n"
     unless exists $channel{$chan};
@@ -882,6 +762,26 @@ sub add_chan_trans {
     unless UNIVERSAL::isa ($trans, 'CODE');
 
   push @{$channel{$chan}{trans}}, $trans;
+  our %chan_trans;
+  $chan_trans{$chan}->{$name} = +{ pos  => $#{$channel{$chan}{trans}},
+                                   tran => $trans,
+                                   create_line => join(':', (caller)[1,2]),
+                                 };
+  return $name;
+}
+
+sub remove_chan_trans {
+  my ($chan, $name) = @_;
+
+  croak "Channel does not exist: $chan\n"
+    unless exists $channel{$chan};
+  our %chan_trans;
+  croak "translator '$name' is not on channel '$chan'"
+    unless my $trans_info = delete $chan_trans{$chan}->{$name};
+  splice @{$channel{$chan}{trans}}, $trans_info->{pos}, 1;
+  $_->{pos}--
+    for grep $_->{pos} > $trans_info->{pos}, values %{$chan_trans{$chan}};
+  return;
 }
 
 # Sinks ----------------------------------------------------------------------
@@ -1015,7 +915,7 @@ use constant REQUIRED_PARAMS =>
    FILE   => [ qw( fn ) ],
    FH     => [ qw( fh ) ],
    SUBR   => [ qw( subr )],
-   SYSLOG => [ ],
+   SYSLOG => [ qw( ) ],
   };
 
 sub add_sink {
@@ -1032,20 +932,37 @@ sub add_sink {
   my %values;
 
   my $required_params = REQUIRED_PARAMS->{$type};
-  croak "Unrecognized sink type: $type\n"
+  croak "Unrecognized sink type: '$type'\n"
     unless defined $required_params;
   croak sprintf ("%s undefined for %s sink type; channel/sink %s/%s\n",
                  $_, $type, $chan, $name)
     for grep ! defined $params->{$_}, @$required_params;
 
+  my $appender_name = "${chan}::${name}";
+
+  my $appender;
   if ( $type eq 'FILE' ) {
     @values{qw( fn maxsize )} = @{$params}{qw( fn maxsize )};
-    $values{maxsize} = 1_024 ** 3 # 1Gb
-      unless defined $values{maxsize};
-    croak
-      sprintf ("maxsize must be greater than 0 for channel/sink %s/%s: %s\n",
-               $chan, $name, $values{maxsize})
-        unless $values{maxsize} > 0;
+    $values{maxsize} //= 1_024 ** 3; # 1Gb
+
+    my ($class, @attrs);
+    if ( $values{maxsize} ) {
+      $class = 'Log::Dispatch::FileRotate';
+      # in _log_to_file, we specified no max count
+      @attrs = (size => $values{maxsize}, max => 1000);
+    } else {
+      $class = 'Log::Dispatch::File';
+    }
+
+    eval "require $class";
+    die "%>require $class<% failed: $@"
+      if @$;
+
+    $appender = Log::Log4perl::Appender->new($class,
+                                             name     => $appender_name,
+                                             filename => $values{fn},
+                                             @attrs);
+    $appender->layout(Log::Log4perl::Layout::PatternLayout->new('%m%n'));
   } elsif ( $type eq 'FH' ) {
     $values{fh}               = $params->{fh};
     croak
@@ -1053,43 +970,50 @@ sub add_sink {
                $chan, $name, ref $values{fh})
         unless UNIVERSAL::isa ($values{fh}, 'IO::Handle')
             or UNIVERSAL::isa ($values{fh}, 'GLOB');
+    my $handle = $values{fh};
+    $handle = Log::Info::GlobHandle->new($handle)
+      if UNIVERSAL::isa ($values{fh}, 'GLOB');
+    $appender  = Log::Log4perl::Appender->new
+      ('Log::Dispatch::Handle',
+       name => $appender_name,
+       handle => $handle,
+      );
+    $appender->layout(Log::Log4perl::Layout::PatternLayout->new('%m%n'));
   } elsif ( $type eq 'SUBR' ) {
-    $values{subr}             = $params->{subr};
+    my $subr = $params->{subr};
     croak
       sprintf ("subr type not acceptable for channel/sink %s/%s: %s\n",
-               $chan, $name, ref $values{subr})
-        unless UNIVERSAL::isa ($values{subr}, 'CODE');
+               $chan, $name, ref $subr)
+      unless UNIVERSAL::isa ($subr, 'CODE');
+
+    $appender = Log::Log4perl::Appender->new('Log::Info::SubAppender',
+                                             name => $appender_name,
+                                             subr => $subr
+                                            );
+
+    $appender->layout(Log::Log4perl::Layout::PatternLayout->new('%m'));
+
   } elsif ( $type eq 'SYSLOG' ) {
-    $values{facility} = $params->{facility};
-
-    {
-      no strict 'refs';
-      croak
-        sprintf ("facility '%s' unrecognized for channel/sink %s/%s\n",
-                 $values{facility}, $chan, $name)
-          if defined $values{facility} and
-            ! grep &$_ eq $values{facility}, LOG_FACILITIES;
+    my $facility = $params->{facility};
+    my @args = ('Log::Dispatch::Syslog',
+                name     => $appender_name,
+               );
+    if ( $facility ) {
+      croak "Invalid facility: '$facility'"
+        unless grep $_ eq 'FTY_' . uc $facility, LOG_FACILITIES;
+      push @args, facility => $facility;
     }
-
-    unless ( $syslog_initialized ) {
-      setlogsock 'unix';
-      openlog $Script, 'cons,pid', 'user';
-      $syslog_initialized = 1;
-    }
+    $appender  = Log::Log4perl::Appender->new(@args);
+    $appender->layout(Log::Log4perl::Layout::PatternLayout->new('%m%n'));
+    
   } else {
-    croak "Unrecognized sink type: $type\n";
+    croak "unrecognized sink type: $type\n";
   }
 
-  my $sink = { type   => $type,
-               level  => $level,
-               values => \%values,
-             };
+  $appender->threshold(LOG4PERL_LEVELS->{$level})
+    if defined $level;
 
-  $channel{$chan}{sinks}{$name} = $sink;
-}
-
-BEGIN {
-  add_sink(CHAN_INFO, SINK_STDERR, 'FH', LOG_WARNING, { fh => *STDERR{IO} });
+  Log::Log4perl->get_logger($chan)->add_appender($appender);
 }
 
 # -------------------------------------
@@ -1121,22 +1045,12 @@ Name of the sink to delete.
 sub delete_sink {
   my ($chan, $sink) = @_;
 
-  croak "Channel does not exist: $chan\n"
-    unless exists $channel{$chan};
+  my $logger = Log::Log4perl->get_logger($chan)
+    or croak "Channel does not exist: $chan\n";
+  my $appender_name = "${chan}::${sink}";
   croak "Channel/Sink does not exist: $chan/$sink\n"
-    unless exists $channel{$chan}{sinks}{$sink};
-
-  if ( $channel{$chan}{sinks}{$sink}{type} eq 'FILE' ) {
-    if ( defined $channel{$chan}{sinks}{$sink}{values}{fh} ) {
-      $channel{$chan}{sinks}{$sink}{values}{fh}->close
-      or warn sprintf("Log::Info::delete_sink : " .
-                      "Close failed on filehandle for channel/sink/filename " .
-                      "%s/%s/%s: $!",
-                      $chan, $sink, $channel{$chan}{sinks}{$sink}{values}{fn});
-    }
-  }
-
-  delete $channel{$chan}{sinks}{$sink};
+    unless grep $appender_name eq $_, @{$logger->{appender_names}};
+  $logger->remove_appender($appender_name);
 }
 
 # -------------------------------------
@@ -1173,13 +1087,19 @@ level E<lt>= lvl.
 sub set_sink_out_level {
   my ($chan, $sink, $level) = @_;
 
-  croak "Channel does not exist: $chan\n"
-    unless exists $channel{$chan};
-  croak "Channel/Sink does not exist: $chan/$sink\n"
-    unless exists $channel{$chan}{sinks}{$sink};
-  $level = get_level($level);
+  my $logger = Log::Log4perl->get_logger($chan)
+    or croak "Channel does not exist: $chan\n";
+  my $appender_name = "${chan}::${sink}";
+  my $appender = Log::Log4perl->appenders->{$appender_name}
+    or croak "cannot find appender $appender_name (Channel/Sink: $chan/sink\n";
 
-  $channel{$chan}{sinks}{$sink}{level} = $level;
+  if ( defined $level ) {
+    $appender->threshold(LOG4PERL_LEVELS->{$level});
+  } else {
+    $appender->threshold('ALL');
+  }
+
+  $logger->set_output_methods;
 }
 
 # -------------------------------------
@@ -1220,15 +1140,65 @@ installed after this one.
 sub add_sink_trans {
   my ($chan, $sink, $trans) = @_;
 
-  croak "Channel does not exist: $chan\n"
-    unless exists $channel{$chan};
-  croak "Channel/Sink does not exist: $chan/$sink\n"
-    unless exists $channel{$chan}{sinks}{$sink};
-  croak sprintf("Translator for %s/%s not a subroutine: %s\n",
-                $chan, $sink, ref $trans)
-    unless UNIVERSAL::isa ($trans, 'CODE');
+  croak sprintf "Translator for %s/%s not a subroutine: %s\n",
+                $chan, $sink, ref $trans
+    unless UNIVERSAL::isa($trans, 'CODE');
 
-  push @{$channel{$chan}{sinks}{$sink}{trans}}, $trans;
+  # @{$channel{$chan}{sinks}{$sink}{trans}}
+  # is (trans0, trans1, trans2, writer) where trans0 is the first translator,
+  # trans1 is the second, etc. and writer is the appender that does the actual
+  # writing
+
+  # trans_by_cs: translator by channel & sink
+  #              each value is is an arrayref.  First element is the writer,
+  #              i.e. the logger that does the writing.  Latter elements are
+  #              the translating loggers, in order of addition
+  state %trans_by_cs;
+
+  my $logger = Log::Log4perl->get_logger($chan)
+    or croak "Channel does not exist: $chan\n";
+
+  my $cs = "${chan}::${sink}";
+  $trans_by_cs{$cs} //=  [ Log::Log4perl->appenders->{$cs} ]
+    or croak "no such channel::sink: $cs\n";
+  my ($writer, @trans) = @{$trans_by_cs{$cs}};
+
+  my $old_last_app;
+
+  if ( @trans ) {
+    $old_last_app    = $trans[-1];
+  } else {
+    $logger->remove_appender($cs);
+  }
+
+  state $name_suffix = 'aaa';
+  my $comp_name = join ':', $chan, $sink, $name_suffix++;
+  my $subr = sub {
+    my ($p, $sub_ap) = @_;
+    my $child_ap = $sub_ap->{child_ap};
+    $p->{message} = $trans->($p->{message});
+    $child_ap->log($p,
+                   $p->{log4p_category},
+                   $p->{log4p_level});
+  };
+
+  my $comp =  Log::Log4perl::Appender->new('Log::Info::SubAppender',
+                                           name     => $comp_name,
+                                           full_p   => 1,
+                                           child_ap => $writer,
+                                           subr     => $subr,
+                                          );
+  $comp->layout(Log::Log4perl::Layout::PatternLayout->new('%m'));
+
+  if ( $old_last_app ) {
+    $old_last_app->{appender}->{child_ap} = $comp;
+  } else {
+    $logger->add_appender($comp);
+  }
+
+  # remember to push onto trans_by_cs here, rather than @trans, because
+  # because @trans is ephemeral
+  push @{$trans_by_cs{$cs}}, $comp;
 }
 
 # -------------------------------------
@@ -1294,85 +1264,33 @@ themselves if necessary.
 
 sub Log {
   my ($channel, $level, $string) = @_;
+  Log::Log4perl::init_once
+    (+{
+       'log4perl.rootLogger' => 'DEBUG, devnull',
 
+       'log4perl.appender.stderr'        => 'Log::Log4perl::Appender::Screen',
+       'log4perl.appender.stderr.stderr' => 1,
+       'log4perl.appender.stderr.layout' =>
+         'Log::Log4perl::Layout::SimpleLayout',
+
+       'log4perl.appender.devnull'          => 'Log::Log4perl::Appender::File',
+       'log4perl.appender.devnull.filename' => '/dev/null',
+       'log4perl.appender.devnull.layout'   =>
+         'Log::Log4perl::Layout::SimpleLayout',
+      });
+
+  croak "no such Log::Info channel '$channel'"
+    unless exists $LOGGERS_BY_NAME->{$channel};
+  my $logger = Log::Log4perl->get_logger($channel);
+
+  my $l4p_level = LOG4PERL_LEVELS->{$level} // _generate_l4p_level($level);
+
+  $string = $_->($string)
+    for @{$channel{$channel}{trans}};
+
+  $logger->log($l4p_level, $string);
   croak "Log::Info::Log : unrecognized channel: $channel\n"
     unless exists $channel{$channel};
-  $level = get_level($level);
-
-  if ( ! defined $string ) {
-    my @caller = caller 1;
-    $string =
-      sprintf('Log::Info::Log *UNDEFINED* (called by %s::%s, at %s line %d)',
-              @caller[0,3,1,2]);
-  }
-
-  my $details = $channel{$channel};
-
-  return
-    unless (( ! defined $channel{$channel}{level}
-              or
-              $level <= $channel{$channel}{level} )
-            and %{$details->{sinks}}
-            and grep({ my $sl = $details->{sinks}->{$_}->{level};
-                       ! defined $sl || $level <= $sl; }
-                     keys %{$details->{sinks}}));
-
-  if ( exists $details->{trans} ) {
-    my $i = 0;
-    my @trans = @{$details->{trans}};
-    while ( $i < @trans ) {
-      eval {
-        $string = $trans[$i]->($string);
-      }; if ( $@ ) {
-        warn ("Log::Info::Log : ",
-              "Bad translation unit ($i) for channel $channel: $@\n");
-      }
-      $i++;
-    }
-  }
-
- SINK:
-  while ( my ($name, $sink) = each %{$details->{sinks}} ) {
-    next SINK
-      if $name eq SINK_STDERR and $dying;
-
-    my ($type, $sinklevel, $trans, $values) =
-      @{$sink}{qw( type level trans values )};
-
-    # Are we below the requisite level?
-    next SINK
-      if defined $sinklevel and $level > $sinklevel;
-
-    # Any further translations?
-    my $sinkstring = $string;
-    if ( defined $trans ) {
-      my $i = 0;
-      my @trans = @$trans;
-      while ( $i < @trans ) {
-        eval {
-          $sinkstring = $trans[$i]->($sinkstring);
-        }; if ( $@ ) {
-          warn (sprintf ("Log::Info::Log : Bad translation unit " .
-                         "(%d) for channel %s sink %s: $@\n",
-                         $i, $channel, $name));
-        }
-        $i++;
-      }
-    }
-
-    if ( $type eq 'FILE' ) {
-      _log_to_file   ($values, $sinkstring, $channel, $name, $level);
-    } elsif ( $type eq 'FH' ) {
-      _log_to_fh     ($values, $sinkstring, $channel, $name, $level);
-    } elsif ( $type eq 'SUBR' ) {
-      _log_to_subr   ($values, $sinkstring, $channel, $name, $level);
-    } elsif ( $type eq 'SYSLOG' ) {
-      _log_to_syslog ($values, $sinkstring, $channel, $name, $level);
-    } else {
-      warn ("Log::Info::Log : Bad sink type ($type) for channel/name ",
-            "$channel/$name\n");
-    }
-  }
 }
 
 # -------------------------------------
@@ -1607,6 +1525,10 @@ sub import {
   for (@_) {
     if ( $_ eq ':trap' ) {
       __trap_warn_die();
+
+    } elsif ( $_ eq ':default_channels' ) {
+      push @export_symbols, $_;
+      add_sink(CHAN_INFO, SINK_STDERR, 'FH', LOG_WARNING, { fh => *STDERR{IO} });
     } elsif ( exists $export_ok{$_} ) {
       push @export_symbols, $_;
     } else {
@@ -1669,17 +1591,19 @@ sub __trap_warn_die {
   my $save;
 
   my $diehook = $SIG{__DIE__};
-  # Carp doesn't call die directly.  In know not how or why.  So this traps
+  # Carp doesn't call die directly.  I know not how or why.  So this traps
   # calls to carp that didn't make it via the override
   $SIG{__DIE__} = sub {
-    local $dying = 1;
     my $message = join '', grep defined, @_;
-      if ( $message !~ /\A[\s\n]*\Z/ ) {
-        Log(CHAN_INFO, LOG_ERR, $message)
-          unless $message eq $lastmessage;
-      }
-    $diehook->(@_)
-      if defined $diehook and UNIVERSAL::isa($diehook, 'CODE');
+
+    if ( $message !~ /\A[\s\n]*\Z/ ) {
+      Log(CHAN_INFO, LOG_ERR, $message)
+        unless $dying or $message eq $lastmessage;
+    }
+    local $dying = 1;
+    if ( defined $diehook and UNIVERSAL::isa($diehook, 'CODE') ) {
+      $diehook->(@_);
+    }
     $! = $save
       if $save;
   };
@@ -1711,13 +1635,18 @@ sub __trap_warn_die {
         $message =~
           s/([^\n])\z/sprintf("%s at %s line %d", $1, (caller)[1,2]) . "\n"/e;
         $message =~ s/\n+\z/\n/;
-        Log(CHAN_INFO, LOG_ERR, $message)
+        Log(CHAN_INFO, LOG_ERR, "$message")
           unless $message eq $lastmessage;
         $lastmessage = $message;
       }
       $! = $save
         if $save;
-      CORE::die("$message");
+      # this causes the message to percolate to the default die handler, which
+      # typically writes it to stderr.  So the message may get output twice.
+      # That is unfortunate, but we need to do this to ensure that $@ is still
+      # set to the message after we exit.  Merely setting $@=$message doesn't
+      # do it.
+      CORE::die($message);
     };
 
 }
@@ -1806,7 +1735,7 @@ sub enable_file_channel {
           # Don't use Log::Info when the channels haven't opened...
           croak "Could not open file descriptor $fd for writing: $!\n";
         }
-        select (((select $fh), $| = 1)[0]);
+        select(((select $fh), $| = 1)[0]);
       } else {
         croak sprintf("Cannot handle non-integer file descriptor " .
                       "argument to %s: %s", $option_name, $fn);
@@ -1829,6 +1758,35 @@ sub enable_file_channel {
 
     return $level - (LOG_INFO - 1);
   }
+}
+
+sub _generate_l4p_level {
+  my ($level) = @_;
+
+  my $l4p_level;
+
+  my @keys = keys %{LOG4PERL_LEVELS()};
+  my ($minkey, $maxkey) = (min(@keys), max(@keys));
+
+  given ( $level ) {
+    when ( $_ < $minkey ) { $l4p_level = 2 * LOG4PERL_LEVELS->{$minkey} }
+
+    when ( $_ > $maxkey ) { $l4p_level = LOG4PERL_LEVELS->{$maxkey} / 2 }
+
+    default {
+      my $lower = max grep $_ < $level, @keys;
+      my $upper = min grep $_ > $level, @keys;
+      $l4p_level = (LOG4PERL_LEVELS->{$lower} + LOG4PERL_LEVELS->{$upper}) / 2;
+    }
+  }
+
+  LOG4PERL_LEVELS->{$level} = $l4p_level;
+  my $level_name = sprintf "LEVEL%d", $level;
+  Log::Log4perl::Level::add_priority(sprintf($level_name), $l4p_level);
+  Log::Log4perl::Logger::create_log_level_methods($level_name);
+  Log::Log4perl::Logger::reset_all_output_methods; # generate all the code-generated levels, etc.
+
+  return $l4p_level;
 }
 
 # ----------------------------------------------------------------------------
@@ -1858,15 +1816,36 @@ Martyn J. Pearce C<fluffy@cpan.org>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2001, 2002, 2003, 2005 Martyn J. Pearce.  This program is free
-software; you can redistribute it and/or modify it under the same terms as
-Perl itself.
+Copyright (c) 2001, 2002, 2003, 2005, 2010 Martyn J. Pearce.  This program is
+free software; you can redistribute it and/or modify it under the same terms
+as Perl itself.
 
 =head1 SEE ALSO
 
 Z<>
 
 =cut
+
+# ----------------------------------------------------------------------------
+
+package Log::Info::GlobHandle;
+
+# compatibility adapter to allow us to use Log::Dispatch::File to log to GLOBs
+
+sub new {
+  my ($class, $handle) = @_;
+  select((select($handle), $|=1)[0]);
+  my $self = \$handle;
+  bless $self, $class;
+}
+
+sub print {
+  my ($self, @msg) = @_;
+  my $handle = $$self;
+  print $handle @msg;
+}
+
+# ----------------------------------------------------------------------------
 
 1; # keep require happy.
 

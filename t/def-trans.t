@@ -11,9 +11,13 @@ This package tests the translator functionality of Log::Info
 use Fatal                 qw( close open read seek );
 use Fcntl                 qw( SEEK_END );
 use File::Glob            qw( );
+use File::Spec::Functions qw( catdir updir );
+use FindBin               qw( $Bin );
 use IO::Select            qw( );
 use POSIX                 qw( tmpnam );
-use Test                  qw( ok plan );
+use Test::More            tests => 10, import => [qw( diag is like ok )];
+
+use lib catdir $Bin, updir, 'lib';
 
 # Channel names for playing with
 use constant TESTCHAN1 => 'testchan1';
@@ -49,12 +53,6 @@ use constant TRANS2 => sub { scalar(reverse($_[0])) . $_[0] };
 use constant TMPNAM1 => tmpnam;
 use constant TMPNAM2 => tmpnam;
 
-BEGIN {
-  plan tests  => 6,
-       todo   => [],
-       ;
-}
-
 use Log::Info qw( :DEFAULT :log_levels );
 
 =head2 Test 1: compilation
@@ -67,7 +65,7 @@ C<Log::Info>.
 
 =cut
 
-ok 1, 1, 'compilation';
+is 1, 1, 'compilation';
 
 # ----------------------------------------------------------------------------
 
@@ -105,20 +103,20 @@ my @messages;
     $ok = 0;
   }
 
-  ok $ok, 1, 'set up channel and listener';
+  is $ok, 1, 'set up channel and listener';
 }
 
 =head2 Test 3: test log message received (TESTCHAN1)
 
 =cut
 
-ok $messages[0], MESSAGE1, 'test log message received (TESTCHAN1)';
+is $messages[0], MESSAGE1, 'test log message received (TESTCHAN1)';
 
 =head2 Test 4: test log message received (TESTCHAN2)
 
 =cut
 
-ok $messages[1], MESSAGE2, 'test log message received (TESTCHAN2)';
+is $messages[1], MESSAGE2, 'test log message received (TESTCHAN2)';
 @messages = ();
 
 # ----------------------------------------------------------------------------
@@ -131,21 +129,25 @@ Test message logged is what is expected after channel translation.
 
 =cut
 
+my $trans_udt_name;
+
 {
   my $ok = 0;
 
-  eval {
+  @messages = ();
+  my $trans_udt_name =
     Log::Info::add_chan_trans(TESTCHAN1, Log::Info::TRANS_UDT);
-    Log(TESTCHAN1, 0, MESSAGE1);
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
+  Log(TESTCHAN1, 0, MESSAGE1);
+  Log::Info::remove_chan_trans(TESTCHAN1, $trans_udt_name);
+  Log(TESTCHAN1, 0, MESSAGE1);
 
-  ok $messages[0], qr/^\[\d+\ \w{3}\ \w{3}\ {1,2}\d{1,2}
-                       \ \d{1,2}:\d{2}:\d{2}\ \d{4}\]
-                       \ @{[MESSAGE1]}$/x, 'TRANS_UDT';
+  is 0+ @messages, 2;
+  diag "TRANS_UDT: $messages[0]"
+    if $ENV{TEST_DEBUG};
+  like $messages[0], qr/^\[\d+\ \w{3}\ \w{3}\ {1,2}\d{1,2}
+                        \ \d{1,2}:\d{2}:\d{2}\ \d{4}\]
+                        \ @{[MESSAGE1]}$/x, 'TRANS_UDT';
+  is $messages[1], MESSAGE1;
   @messages = ();
 }
 
@@ -162,18 +164,21 @@ Test message logged is what is expected after channel translation.
 {
   my $ok = 0;
 
-  eval {
-    Log::Info::add_chan_trans(TESTCHAN2, Log::Info::TRANS_CDT);
-    Log(TESTCHAN2, 0, MESSAGE2);
-  }; if ( $@ ) {
-    print STDERR "Test failed:\n$@\n"
-      if $ENV{TEST_DEBUG};
-    $ok = 0;
-  }
+  @messages = ();
 
-  ok $messages[0], qr/^\[\d+\(\d{1,2}\w{3}\ \d{1,2}:\d{1,2}(?::\d{1,2})?
+  my $trans_cdt_name = 'Barney Mcgrew';
+  Log::Info::add_chan_trans(TESTCHAN2, Log::Info::TRANS_CDT, $trans_cdt_name);
+  Log(TESTCHAN2, 0, MESSAGE2);
+  Log::Info::remove_chan_trans(TESTCHAN2, $trans_cdt_name);
+  Log(TESTCHAN2, 0, MESSAGE2);
+
+  is 0+ @messages, 2;
+  diag "TRANS_CDT: $messages[0]"
+    if $ENV{TEST_DEBUG};
+  like $messages[0], qr/^\[\d+\(\d{1,2}\w{3}\ \d{1,2}:\d{1,2}(?::\d{1,2})?
                          [+-]\d+\):$0\]
-                       \ @{[MESSAGE2]}$/x, 'TRANS_UDT';
+                         \ @{[MESSAGE2]}$/x, 'TRANS_CDT';
+  is $messages[1], MESSAGE2;
   @messages = ();
 }
 

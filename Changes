@@ -1,5 +1,19 @@
 Revision history for Perl extension Log::Info.
 
+2.00  Sun Dec 19  8:56AM GMT 2010
+ 	- Log::Info is now a wrapper around Log::Log4perl.  This is intended
+	  as a migration path.  New users should just use Log::Log4perl
+	  instead.  Existing users should start migrating.  t/log4perl.t has
+	  examples of mixed use.
+
+1.22  Wed Feb 24  5:50PM GMT 2010
+	- Log::Info::Fork no longer works well with arbitrary file descriptors.
+	  rather than fixing, I've demoted the test as prelude to integrating
+	  with IPC::System or IPC::Run.
+        - tweak single-die.t to work with modern Carp installs
+	- migrate syslog.t to xt/ (because it writes to syslog, which upsets
+	  people running syslog reapers)
+
 1.21  Sat Feb  5  5:24PM GMT 2005
 	- Return log level from enable_file_channel (relative to LOG_INFO-1)
 
